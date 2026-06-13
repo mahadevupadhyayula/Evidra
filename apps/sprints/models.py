@@ -34,6 +34,13 @@ class InterviewSprint(models.Model):
         blank=True,
         related_name="active_for_sprints",
     )
+    active_profile = models.ForeignKey(
+        "profiles.CareerProfile",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="active_for_sprints",
+    )
     state = models.CharField(
         max_length=32,
         choices=SprintState.choices,

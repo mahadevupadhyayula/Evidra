@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.common",
     "apps.documents",
+    "apps.profiles",
     "apps.sprints",
     "apps.workspace",
 ]
@@ -121,6 +122,8 @@ PRIVATE_MEDIA_ROOT = Path(
     os.getenv("EVIDRA_PRIVATE_STORAGE_ROOT", BASE_DIR / ".private" / "uploads")
 )
 RESUME_MAX_UPLOAD_BYTES = int(os.getenv("EVIDRA_RESUME_MAX_UPLOAD_BYTES", str(5 * 1024 * 1024)))
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+EVIDRA_OPENAI_MODEL = os.getenv("EVIDRA_OPENAI_MODEL", "gpt-4o-mini")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_URL = "accounts:login"

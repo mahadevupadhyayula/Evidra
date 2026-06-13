@@ -142,3 +142,46 @@ class SprintWorkflowService:
             locked_sprint.state = SprintState.RESUME_READY
             locked_sprint.save(update_fields=["active_resume", "state", "updated_at"])
             return locked_sprint
+
+    @staticmethod
+    def mark_profile_confirmed(*, user, sprint: InterviewSprint, profile) -> InterviewSprint:
+        if (
+            not user.is_authenticated
+            or sprint.user_id != user.id
+            or profile.user_id != user.id
+        ):
+            raise SprintOwnershipError("Sprint or profile is not owned by this user.")
+        has_confirmed_profile = (
+            profile.confirmation_status == "CONFIRMED"
+            and sprint.active_resume_id == profile.active_resume_id
+        )
+        if not has_confirmed_profile:
+            raise SprintTransitionConditionMissing(
+                "A confirmed profile for the active resume is required."
+            )
+
+        with transaction.atomic():
+            locked_sprint = InterviewSprint.objects.select_for_update().get(
+                pk=sprint.pk,
+                user=user,
+            )
+            current_state = SprintState(locked_sprint.state)
+            if current_state == SprintState.PROFILE_CONFIRMED:
+                if locked_sprint.active_profile_id != profile.pk:
+                    raise InvalidSprintTransition(
+                        "Cannot replace a confirmed Sprint profile in this stage."
+                    )
+                return locked_sprint
+            if current_state != SprintState.RESUME_READY:
+                raise InvalidSprintTransition(
+                    f"Cannot mark profile confirmed while Sprint is in {current_state}."
+                )
+            if locked_sprint.active_resume_id != profile.active_resume_id:
+                raise SprintTransitionConditionMissing(
+                    "Profile must belong to the Sprint's active resume."
+                )
+
+            locked_sprint.active_profile = profile
+            locked_sprint.state = SprintState.PROFILE_CONFIRMED
+            locked_sprint.save(update_fields=["active_profile", "state", "updated_at"])
+            return locked_sprint

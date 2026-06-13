@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Review profile · Evidra{% endblock %}
+{% block content %}
+  <section class="card">
+    <p class="eyebrow">Profile</p>
+    <h1>Review your career profile</h1>
+    <p>We draft this from your confirmed resume only. Correct anything that is wrong and leave unknown fields blank.</p>
+    {% if profile.extraction_status != "SUCCEEDED" %}
+      <form method="post" action="{% url 'profiles:profile_generate' %}">
+        {% csrf_token %}
+        <button type="submit">Generate draft from confirmed resume</button>
+      </form>
+    {% endif %}
+    {% if profile.extraction_error %}
+      <p>{{ profile.extraction_error }}</p>
+    {% endif %}
+    <form method="post" action="{% url 'profiles:profile_save' profile.id %}">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit">Save draft</button>
+      <button type="submit" formaction="{% url 'profiles:profile_confirm' profile.id %}">Confirm profile</button>
+    </form>
+  </section>
+{% endblock %}
