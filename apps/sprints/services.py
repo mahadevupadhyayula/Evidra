@@ -88,7 +88,10 @@ class SprintWorkflowService:
 
         target_state = SprintState(to_state)
         with transaction.atomic():
-            locked_sprint = InterviewSprint.objects.select_for_update().get(pk=sprint.pk, user=user)
+            locked_sprint = InterviewSprint.objects.select_for_update().get(
+                pk=sprint.pk,
+                user=user,
+            )
             current_state = SprintState(locked_sprint.state)
             allowed_targets = ALLOWED_TRANSITIONS[current_state]
             if target_state not in allowed_targets:
@@ -100,3 +103,42 @@ class SprintWorkflowService:
                 f"Transition from {current_state} to {target_state} requires "
                 "stage-specific condition validation."
             )
+
+    @staticmethod
+    def mark_resume_ready(*, user, sprint: InterviewSprint, document) -> InterviewSprint:
+        if (
+            not user.is_authenticated
+            or sprint.user_id != user.id
+            or document.user_id != user.id
+        ):
+            raise SprintOwnershipError("Sprint or resume is not owned by this user.")
+        has_confirmed_resume = (
+            document.is_active
+            and document.parsing_status == "CONFIRMED"
+            and document.cleaned_text.strip()
+        )
+        if not has_confirmed_resume:
+            raise SprintTransitionConditionMissing(
+                "A confirmed active resume is required before moving to RESUME_READY."
+            )
+
+        with transaction.atomic():
+            locked_sprint = InterviewSprint.objects.select_for_update().get(
+                pk=sprint.pk,
+                user=user,
+            )
+            current_state = SprintState(locked_sprint.state)
+            if current_state == SprintState.RESUME_READY:
+                if locked_sprint.active_resume_id != document.pk:
+                    locked_sprint.active_resume = document
+                    locked_sprint.save(update_fields=["active_resume", "updated_at"])
+                return locked_sprint
+            if current_state != SprintState.DRAFT:
+                raise InvalidSprintTransition(
+                    f"Cannot mark resume ready while Sprint is in {current_state}."
+                )
+
+            locked_sprint.active_resume = document
+            locked_sprint.state = SprintState.RESUME_READY
+            locked_sprint.save(update_fields=["active_resume", "state", "updated_at"])
+            return locked_sprint

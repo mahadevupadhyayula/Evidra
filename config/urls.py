@@ -13,5 +13,6 @@ urlpatterns = [
     path("", home, name="home"),
     path("admin/", admin.site.urls),
     path("accounts/", include("apps.accounts.urls")),
+    path("workspace/resume/", include("apps.documents.urls")),
     path("workspace/", include("apps.workspace.urls")),
 ]

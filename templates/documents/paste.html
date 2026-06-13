@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Paste resume · Evidra{% endblock %}
+{% block content %}
+  <section class="card">
+    <p class="eyebrow">Paste fallback</p>
+    <h1>Paste your resume text</h1>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <div class="field">
+        {{ form.resume_text.label_tag }}
+        {{ form.resume_text }}
+        {{ form.resume_text.errors }}
+      </div>
+      <button type="submit">Review pasted text</button>
+    </form>
+    <p><a href="{% url 'documents:resume_upload' %}">Back to upload</a></p>
+  </section>
+{% endblock %}

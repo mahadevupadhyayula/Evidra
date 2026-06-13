@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "apps.accounts",
     "apps.common",
+    "apps.documents",
     "apps.sprints",
     "apps.workspace",
 ]
@@ -116,6 +117,10 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
+PRIVATE_MEDIA_ROOT = Path(
+    os.getenv("EVIDRA_PRIVATE_STORAGE_ROOT", BASE_DIR / ".private" / "uploads")
+)
+RESUME_MAX_UPLOAD_BYTES = int(os.getenv("EVIDRA_RESUME_MAX_UPLOAD_BYTES", str(5 * 1024 * 1024)))
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_URL = "accounts:login"

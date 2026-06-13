@@ -6,6 +6,16 @@
     <h1>Your Interview Sprint</h1>
     {% if sprint %}
       <p>Your current Sprint is ready to resume.</p>
+      {% if sprint.state == "DRAFT" %}
+        <p>Next step: add and confirm your resume.</p>
+        <p><a class="button-link" href="{% url 'documents:resume_upload' %}">Add resume</a></p>
+      {% elif sprint.state == "RESUME_READY" %}
+        <p>Your resume is confirmed. Profile extraction comes in the next approved stage.</p>
+        <form method="post" action="{% url 'documents:resume_replace' %}">
+          {% csrf_token %}
+          <button type="submit">Replace resume</button>
+        </form>
+      {% endif %}
       <dl class="summary-list">
         <dt>Sprint ID</dt>
         <dd>{{ sprint.id }}</dd>

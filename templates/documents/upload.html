@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Upload resume · Evidra{% endblock %}
+{% block content %}
+  <section class="card">
+    <p class="eyebrow">Stage 1B · Resume intake</p>
+    <h1>Upload your resume</h1>
+    {% if active_resume %}
+      <p>Your current confirmed resume stays active until you confirm a replacement.</p>
+    {% endif %}
+    <form method="post" enctype="multipart/form-data" novalidate>
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <div class="field">
+        {{ form.resume_file.label_tag }}
+        {{ form.resume_file }}
+        {{ form.resume_file.errors }}
+        <p class="help-text">PDF or DOCX only. Scanned resumes without selectable text are not supported in the MBP.</p>
+      </div>
+      <button type="submit">Upload and parse resume</button>
+    </form>
+    <p>Prefer not to upload, or did parsing fail? <a href="{% url 'documents:resume_paste' %}">Paste your resume text</a>.</p>
+  </section>
+{% endblock %}
