@@ -31,10 +31,30 @@ Read these documents before implementation:
 - Database-backed `GenerationRun` worker using a Django management command.
 - Razorpay for the first MBP payment provider.
 
+## Local setup
+
+1. Create and activate a Python 3.12+ virtual environment.
+2. Install dependencies with `python -m pip install -r requirements-dev.txt`.
+3. Copy `.env.example` to `.env` and adjust local settings as needed.
+4. Start PostgreSQL with `docker compose up -d postgres` when using the sample `DATABASE_URL`.
+5. Run migrations with `DJANGO_SETTINGS_MODULE=config.settings python manage.py migrate`.
+6. Start the app with `DJANGO_SETTINGS_MODULE=config.settings python manage.py runserver`.
+
+If `DATABASE_URL` is unset, local commands default to SQLite for lightweight development and tests. Deployed environments should configure PostgreSQL.
+
+## Quality checks
+
+Run these before reporting completion:
+
+- `make lint`
+- `make check`
+- `make test`
+- `make migrations-check`
+
 ## Explicit non-goals for the MBP
 
 Do not introduce Next.js, FastAPI, Redis, Celery, microservices, pgvector, embeddings, multi-agent orchestration, subscriptions, audio/video practice, mobile apps, browser extensions or production-scale observability.
 
 ## Repository status
 
-This repository currently contains source-of-truth documentation and repository control files only. It is not yet a Django project.
+Stage 1A has introduced the Django foundation, email/password accounts, session handling, workspace page, and deterministic Interview Sprint workflow foundation.
