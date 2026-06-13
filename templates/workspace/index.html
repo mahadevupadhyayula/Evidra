@@ -10,11 +10,14 @@
         <p>Next step: add and confirm your resume.</p>
         <p><a class="button-link" href="{% url 'documents:resume_upload' %}">Add resume</a></p>
       {% elif sprint.state == "RESUME_READY" %}
-        <p>Your resume is confirmed. Profile extraction comes in the next approved stage.</p>
+        <p>Your resume is confirmed. Review and confirm your career profile next.</p>
+        <p><a class="button-link" href="{% url 'profiles:profile_review' %}">Review profile</a></p>
         <form method="post" action="{% url 'documents:resume_replace' %}">
           {% csrf_token %}
           <button type="submit">Replace resume</button>
         </form>
+      {% elif sprint.state == "PROFILE_CONFIRMED" %}
+        <p>Your career profile is confirmed. Opportunity context is not part of this approved stage.</p>
       {% endif %}
       <dl class="summary-list">
         <dt>Sprint ID</dt>
