@@ -296,6 +296,7 @@ Opportunity rules:
 - Role family is required.
 - User-selected role family is authoritative.
 - Do not perform broad web research.
+- Do not integrate search engines for company context.
 - Block localhost, private IP, file, and internal URLs.
 - Limit redirects, download size, and request duration.
 - User confirms opportunity and company context before downstream use.

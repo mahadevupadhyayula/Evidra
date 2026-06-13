@@ -27,7 +27,7 @@ Do not reintroduce the former ten-week production architecture.
 - Put deterministic state transitions in one workflow service.
 - Use Pydantic for structured AI output validation.
 - Mock external services in automated tests.
-- Do not introduce Redis, Celery, microservices, pgvector or agent frameworks.
+- Do not introduce Redis, Celery, microservices, pgvector, embeddings or agent frameworks.
 
 ## AI rules
 

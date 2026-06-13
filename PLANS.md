@@ -11,11 +11,12 @@ This repository follows the Python MBP source-of-truth documents in `docs/produc
 
 ## Approved implementation sequence
 
-1. Foundation, authentication, resume and profile.
-2. Opportunity context and approved evidence.
-3. Reusable stories, contextual matching and free preview.
-4. Razorpay payment and paid Prep Kit.
-5. Text practice and seven-day plan.
+1. Iteration 1, Stage 1A: foundation, authentication, resume and profile planning.
+2. Iteration 1, Stage 1B: foundation, authentication, resume and profile implementation.
+3. Iteration 2: opportunity context and approved evidence.
+4. Iteration 3: reusable stories, contextual matching and free preview.
+5. Iteration 4: Razorpay payment and paid Prep Kit.
+6. Iteration 5: text practice and seven-day plan.
 
 ## Planning rules
 

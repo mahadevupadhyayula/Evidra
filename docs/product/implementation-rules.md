@@ -97,6 +97,7 @@ AI may not:
 - Invent metrics, employers, achievements, or sensitive attributes.
 - Remove provenance.
 - Perform broad web research.
+- Integrate search engines for company context.
 
 Every AI operation uses:
 
