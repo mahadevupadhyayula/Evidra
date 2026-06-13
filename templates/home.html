@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Evidra Interview Sprint{% endblock %}
+{% block content %}
+  <section class="hero">
+    <p class="eyebrow">Evidence-first interview preparation</p>
+    <h1>Build a grounded Interview Sprint.</h1>
+    <p>Start with a private workspace and create your first Sprint. Resume, profile, AI, payment and prep-kit steps come in later approved stages.</p>
+    <div class="actions">
+      <a class="button-link" href="{% url 'accounts:signup' %}">Create account</a>
+      <a href="{% url 'accounts:login' %}">Log in</a>
+    </div>
+  </section>
+{% endblock %}

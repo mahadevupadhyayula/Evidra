@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Workspace · Evidra{% endblock %}
+{% block content %}
+  <section class="card">
+    <p class="eyebrow">Workspace</p>
+    <h1>Your Interview Sprint</h1>
+    {% if sprint %}
+      <p>Your current Sprint is ready to resume.</p>
+      <dl class="summary-list">
+        <dt>Sprint ID</dt>
+        <dd>{{ sprint.id }}</dd>
+        <dt>State</dt>
+        <dd><strong>{{ sprint.state }}</strong></dd>
+      </dl>
+      <form method="post" action="{% url 'workspace:current_sprint' %}">
+        {% csrf_token %}
+        <button type="submit">Resume Sprint</button>
+      </form>
+    {% else %}
+      <p>Create a Draft Interview Sprint to start the MBP workflow foundation.</p>
+      <form method="post" action="{% url 'workspace:current_sprint' %}">
+        {% csrf_token %}
+        <button type="submit">Create Interview Sprint</button>
+      </form>
+    {% endif %}
+  </section>
+{% endblock %}

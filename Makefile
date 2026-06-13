@@ -4,10 +4,10 @@ lint:
 	python -m ruff check .
 
 check:
-	python -m django check
+	DJANGO_SETTINGS_MODULE=config.settings python -m django check
 
 test:
-	python -m pytest
+	DJANGO_SETTINGS_MODULE=config.settings python -m pytest
 
 migrations-check:
-	python -m django makemigrations --check --dry-run
+	DJANGO_SETTINGS_MODULE=config.settings python -m django makemigrations --check --dry-run
