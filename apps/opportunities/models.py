@@ -21,6 +21,14 @@ class OpportunityStatus(models.TextChoices):
     STALE = "STALE", "Stale"
 
 
+class CompanyContextStatus(models.TextChoices):
+    NOT_PROVIDED = "NOT_PROVIDED", "Not provided"
+    PENDING_REVIEW = "PENDING_REVIEW", "Pending review"
+    CONFIRMED = "CONFIRMED", "Confirmed"
+    SKIPPED = "SKIPPED", "Skipped"
+    FAILED = "FAILED", "Failed"
+
+
 class Opportunity(models.Model):
     sprint = models.ForeignKey(
         "sprints.InterviewSprint",
@@ -31,12 +39,20 @@ class Opportunity(models.Model):
     role_family = models.CharField(max_length=64, choices=RoleFamily.choices, db_index=True)
     target_seniority = models.CharField(max_length=128)
     company_name = models.CharField(max_length=255)
+    company_url = models.URLField(max_length=2048, blank=True)
     job_description = models.TextField()
     interview_stage = models.CharField(max_length=128, blank=True)
     interview_date = models.DateField(null=True, blank=True)
     concerns = models.TextField(blank=True)
     improvement_goals = models.TextField(blank=True)
     jd_analysis = models.JSONField(null=True, blank=True)
+    company_context = models.JSONField(null=True, blank=True)
+    company_context_status = models.CharField(
+        max_length=32,
+        choices=CompanyContextStatus.choices,
+        default=CompanyContextStatus.NOT_PROVIDED,
+        db_index=True,
+    )
     confirmation_status = models.CharField(
         max_length=32,
         choices=OpportunityStatus.choices,

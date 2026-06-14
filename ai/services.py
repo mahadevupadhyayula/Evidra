@@ -7,11 +7,14 @@ from pydantic import ValidationError
 
 from ai.client import (
     AIClientError,
+    CompanyContextExtractionClient,
     JDAnalysisClient,
+    OpenAICompanyContextClient,
     OpenAIJDClient,
     OpenAIProfileClient,
     ProfileExtractionClient,
 )
+from ai.schemas.company_context import CompanyContext
 from ai.schemas.jd import JDAnalysis
 from ai.schemas.profile import ExtractedProfile
 
@@ -22,6 +25,10 @@ class AIProfileExtractionError(RuntimeError):
 
 class AIJDAnalysisError(RuntimeError):
     """Raised when JD analysis cannot produce valid structured output."""
+
+
+class AICompanyContextExtractionError(RuntimeError):
+    """Raised when company context extraction cannot produce valid structured output."""
 
 
 NUMERIC_CLAIM_PATTERN = re.compile(r"\b\d+(?:[,.]\d+)?%?\b")
@@ -63,7 +70,9 @@ def _has_unsupported_numeric_claim(value: str, normalized_resume: str) -> bool:
 
 @dataclass(frozen=True)
 class EvidraAIService:
-    client: ProfileExtractionClient | JDAnalysisClient | None = None
+    client: (
+        ProfileExtractionClient | JDAnalysisClient | CompanyContextExtractionClient | None
+    ) = None
 
     def extract_profile(self, confirmed_resume_text: str) -> ExtractedProfile:
         resume_text = confirmed_resume_text.strip()
@@ -86,6 +95,42 @@ class EvidraAIService:
                 retry_context = str(exc)
         raise AIProfileExtractionError(
             "Profile extraction returned invalid structured output."
+        ) from last_error
+
+    def extract_company_context(
+        self,
+        *,
+        source_text: str,
+        source_type: str,
+        source_url: str | None = None,
+    ) -> CompanyContext:
+        context_text = source_text.strip()
+        if not context_text:
+            raise AICompanyContextExtractionError("Company context source text is required.")
+        if source_type not in {"url", "paste"}:
+            raise AICompanyContextExtractionError("Company context source type is invalid.")
+
+        client = self.client or OpenAICompanyContextClient()
+        if not hasattr(client, "extract_company_context"):
+            raise AICompanyContextExtractionError("Company context client is not configured.")
+
+        last_error: Exception | None = None
+        retry_context: str | None = None
+        for _attempt in range(2):
+            try:
+                raw_context = client.extract_company_context(
+                    source_text=context_text,
+                    source_type=source_type,
+                    source_url=source_url,
+                    retry_context=retry_context,
+                )
+                context = CompanyContext.model_validate(raw_context)
+                return ground_company_context_in_source(context, context_text)
+            except (AIClientError, ValidationError, ValueError) as exc:
+                last_error = exc
+                retry_context = str(exc)
+        raise AICompanyContextExtractionError(
+            "Company context extraction returned invalid structured output."
         ) from last_error
 
     def analyze_jd(
@@ -171,3 +216,48 @@ def _valid_source_excerpt(source_excerpt: str | None, normalized_jd: str) -> str
     if source_excerpt.casefold() in normalized_jd:
         return source_excerpt
     return None
+
+
+def ground_company_context_in_source(context: CompanyContext, source_text: str) -> CompanyContext:
+    normalized_source = _normalize_grounding_text(source_text)
+    valid_references = [
+        reference
+        for reference in context.source_references
+        if _normalize_grounding_text(reference.source_excerpt)
+        and _normalize_grounding_text(reference.source_excerpt) in normalized_source
+    ]
+    referenced_fields = {reference.field for reference in valid_references}
+    extracted_fields = {
+        field_name
+        for field_name in [
+            "company_description",
+            "products_or_services",
+            "target_users",
+            "business_model_clues",
+            "product_terminology",
+            "strategic_themes",
+        ]
+        if getattr(context, field_name)
+    }
+    unsupported_fields = extracted_fields - referenced_fields
+    if unsupported_fields:
+        raise ValueError("Company context fields must include valid source references.")
+    unsupported_values = [
+        field_name
+        for field_name in extracted_fields
+        if not _company_context_field_values_are_supported(
+            getattr(context, field_name), normalized_source
+        )
+    ]
+    if unsupported_values:
+        raise ValueError("Company context values must appear in the provided source text.")
+    return context.model_copy(update={"source_references": valid_references})
+
+
+def _company_context_field_values_are_supported(value: object, normalized_source: str) -> bool:
+    values = value if isinstance(value, list) else [value]
+    return all(_normalize_grounding_text(item) in normalized_source for item in values if item)
+
+
+def _normalize_grounding_text(value: object) -> str:
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", str(value).casefold()).split())
