@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Evidence Review · Evidra{% endblock %}
+{% block content %}
+  <section class="card">
+    <p class="eyebrow">Approved Evidence</p>
+    <h1>Review career evidence</h1>
+    <p>Add manual highlights, extract evidence from your confirmed resume, then approve at least three cards. At least two approved cards need a clear result.</p>
+    <dl class="summary-list">
+      <dt>Sprint state</dt>
+      <dd><strong>{{ sprint.state }}</strong></dd>
+      <dt>Approved cards</dt>
+      <dd>{{ threshold.approved_count }} / 3</dd>
+      <dt>Approved cards with clear results</dt>
+      <dd>{{ threshold.clear_result_count }} / 2</dd>
+    </dl>
+    {% if sprint.state != "EVIDENCE_APPROVED" %}
+      <form method="post" action="{% url 'evidence:evidence_extract' %}">
+        {% csrf_token %}
+        <button type="submit">Extract evidence from resume and highlights</button>
+      </form>
+      <form method="post" action="{% url 'evidence:evidence_continue' %}">
+        {% csrf_token %}
+        <button type="submit">Continue when evidence threshold is met</button>
+      </form>
+    {% else %}
+      <p><strong>Evidence approved.</strong> Story generation is intentionally not part of this stage.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Manual career highlights</h2>
+    {% if sprint.state != "EVIDENCE_APPROVED" %}
+      <form method="post" action="{% url 'evidence:highlight_add' %}">
+        {% csrf_token %}
+        {{ highlight_form.as_p }}
+        <button type="submit">Add highlight</button>
+      </form>
+    {% endif %}
+    {% for highlight in highlights %}
+      <article class="nested-card">
+        <h3>{{ highlight.title }}</h3>
+        <p>{{ highlight.description }}</p>
+        {% if highlight.metric %}<p><strong>Metric:</strong> {{ highlight.metric }}</p>{% endif %}
+        {% if highlight.skills %}<p><strong>Skills:</strong> {{ highlight.skills|join:", " }}</p>{% endif %}
+        {% if highlight.source_note %}<p><strong>Source note:</strong> {{ highlight.source_note }}</p>{% endif %}
+        {% if sprint.state != "EVIDENCE_APPROVED" %}
+          <form method="post" action="{% url 'evidence:highlight_archive' highlight.id %}">
+            {% csrf_token %}
+            <button type="submit">Remove from active review</button>
+          </form>
+        {% endif %}
+      </article>
+    {% empty %}
+      <p>No manual highlights yet.</p>
+    {% endfor %}
+  </section>
+
+  <section class="card">
+    <h2>Evidence cards</h2>
+    {% for card in cards %}
+      <article class="nested-card">
+        <h3>{{ card.title }}</h3>
+        <p><strong>Status:</strong> {{ card.status }}</p>
+        {% if card.duplicate_of %}<p><strong>Possible duplicate:</strong> {{ card.duplicate_of.title }} — {{ card.duplicate_reason }}</p>{% endif %}
+        {% if card.problem %}<p><strong>Problem:</strong> {{ card.problem }}</p>{% endif %}
+        {% if card.role %}<p><strong>Role:</strong> {{ card.role }}</p>{% endif %}
+        {% if card.action %}<p><strong>Action:</strong> {{ card.action }}</p>{% endif %}
+        {% if card.result %}<p><strong>Result:</strong> {{ card.result }}</p>{% endif %}
+        {% if card.metric %}<p><strong>Metric:</strong> {{ card.metric }}</p>{% endif %}
+        {% if card.skills %}<p><strong>Skills:</strong> {{ card.skills|join:", " }}</p>{% endif %}
+        {% if card.competencies %}<p><strong>Competencies:</strong> {{ card.competencies|join:", " }}</p>{% endif %}
+        <p><strong>Confidential:</strong> {{ card.confidentiality|yesno:"Yes,No" }}</p>
+        <blockquote>{{ card.source_excerpt }}</blockquote>
+        {% if card.source_location %}<p><strong>Source location:</strong> {{ card.source_location }}</p>{% endif %}
+        {% if card.missing_details %}
+          <p><strong>Missing details:</strong></p>
+          <ul>
+            {% for prompt in card.missing_details %}<li>{{ prompt }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+        {% if sprint.state != "EVIDENCE_APPROVED" and card.status != "REJECTED" and card.status != "STALE" %}
+          <details {% if editing_card.id == card.id %}open{% endif %}>
+            <summary>Edit this card</summary>
+            {% if editing_card.id == card.id and card_form %}
+              <form method="post" action="{% url 'evidence:card_save' card.id %}">
+                {% csrf_token %}
+                {{ card_form.as_p }}
+                <button type="submit">Save edits</button>
+              </form>
+            {% else %}
+              <form method="post" action="{% url 'evidence:card_save' card.id %}">
+                {% csrf_token %}
+                <p><label>Title <input type="text" name="title" value="{{ card.title }}"></label></p>
+                <p><label>Problem <textarea name="problem" rows="2">{{ card.problem|default_if_none:'' }}</textarea></label></p>
+                <p><label>Role <textarea name="role" rows="2">{{ card.role|default_if_none:'' }}</textarea></label></p>
+                <p><label>Action <textarea name="action" rows="3">{{ card.action|default_if_none:'' }}</textarea></label></p>
+                <p><label>Result <textarea name="result" rows="2">{{ card.result|default_if_none:'' }}</textarea></label></p>
+                <p><label>Metric <input type="text" name="metric" value="{{ card.metric|default_if_none:'' }}"></label></p>
+                <p><label><input type="checkbox" name="metric_user_corrected" {% if card.user_edited_data.metric_user_corrected %}checked{% endif %}> I confirm this metric if it is not present in the source text.</label></p>
+                <p><label>Skills <input type="text" name="skills_text" value="{{ card.skills|join:', ' }}"></label></p>
+                <p><label>Competencies <input type="text" name="competencies_text" value="{{ card.competencies|join:', ' }}"></label></p>
+                <p><label>Ownership signal <textarea name="ownership_signal" rows="2">{{ card.ownership_signal|default_if_none:'' }}</textarea></label></p>
+                <p><label>Constraints <textarea name="constraints" rows="2">{{ card.constraints|default_if_none:'' }}</textarea></label></p>
+                <p><label>Tradeoffs <textarea name="tradeoffs" rows="2">{{ card.tradeoffs|default_if_none:'' }}</textarea></label></p>
+                <p><label>Missing-detail prompts <textarea name="missing_details_text" rows="2">{{ card.missing_details|join:', ' }}</textarea></label></p>
+                <p><label>Source excerpt <textarea name="source_excerpt" rows="3">{{ card.source_excerpt }}</textarea></label></p>
+                <p><label>Source location <input type="text" name="source_location" value="{{ card.source_location }}"></label></p>
+                <p><label><input type="checkbox" name="confidentiality" {% if card.confidentiality %}checked{% endif %}> Confidential</label></p>
+                <button type="submit">Save edits</button>
+              </form>
+            {% endif %}
+          </details>
+          <form method="post" action="{% url 'evidence:card_approve' card.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="title" value="{{ card.title }}">
+            <input type="hidden" name="problem" value="{{ card.problem|default_if_none:'' }}">
+            <input type="hidden" name="role" value="{{ card.role|default_if_none:'' }}">
+            <input type="hidden" name="action" value="{{ card.action|default_if_none:'' }}">
+            <input type="hidden" name="result" value="{{ card.result|default_if_none:'' }}">
+            <input type="hidden" name="metric" value="{{ card.metric|default_if_none:'' }}">
+            <input type="hidden" name="skills_text" value="{{ card.skills|join:', ' }}">
+            <input type="hidden" name="competencies_text" value="{{ card.competencies|join:', ' }}">
+            <input type="hidden" name="missing_details_text" value="{{ card.missing_details|join:', ' }}">
+            <input type="hidden" name="ownership_signal" value="{{ card.ownership_signal|default_if_none:'' }}">
+            <input type="hidden" name="constraints" value="{{ card.constraints|default_if_none:'' }}">
+            <input type="hidden" name="tradeoffs" value="{{ card.tradeoffs|default_if_none:'' }}">
+            <input type="hidden" name="source_excerpt" value="{{ card.source_excerpt }}">
+            <input type="hidden" name="source_location" value="{{ card.source_location }}">
+            {% if card.confidentiality %}<input type="hidden" name="confidentiality" value="on">{% endif %}
+            <button type="submit">Approve</button>
+          </form>
+          <form method="post" action="{% url 'evidence:card_reject' card.id %}">
+            {% csrf_token %}
+            <button type="submit">Reject</button>
+          </form>
+        {% endif %}
+      </article>
+    {% empty %}
+      <p>No evidence cards yet. Add a highlight or run extraction.</p>
+    {% endfor %}
+  </section>
+{% endblock %}

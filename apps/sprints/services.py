@@ -218,3 +218,53 @@ class SprintWorkflowService:
             locked_sprint.state = SprintState.OPPORTUNITY_CONFIRMED
             locked_sprint.save(update_fields=["state", "updated_at"])
             return locked_sprint
+
+    @staticmethod
+    def mark_evidence_review_started(
+        *, user, sprint: InterviewSprint, has_reviewable_evidence: bool
+    ) -> InterviewSprint:
+        if not user.is_authenticated or sprint.user_id != user.id:
+            raise SprintOwnershipError("Sprint is not owned by this user.")
+        if not has_reviewable_evidence:
+            raise SprintTransitionConditionMissing(
+                "Evidence candidates or manual highlights are required for review."
+            )
+
+        with transaction.atomic():
+            locked_sprint = InterviewSprint.objects.select_for_update().get(pk=sprint.pk, user=user)
+            current_state = SprintState(locked_sprint.state)
+            if current_state == SprintState.EVIDENCE_REVIEW:
+                return locked_sprint
+            if current_state != SprintState.OPPORTUNITY_CONFIRMED:
+                raise InvalidSprintTransition(
+                    f"Cannot start evidence review while Sprint is in {current_state}."
+                )
+            if locked_sprint.active_profile_id is None or locked_sprint.active_resume_id is None:
+                raise SprintTransitionConditionMissing(
+                    "A confirmed active resume and profile are required before evidence review."
+                )
+            locked_sprint.state = SprintState.EVIDENCE_REVIEW
+            locked_sprint.save(update_fields=["state", "updated_at"])
+            return locked_sprint
+
+    @staticmethod
+    def mark_evidence_approved(
+        *, user, sprint: InterviewSprint, threshold_met: bool
+    ) -> InterviewSprint:
+        if not user.is_authenticated or sprint.user_id != user.id:
+            raise SprintOwnershipError("Sprint is not owned by this user.")
+        if not threshold_met:
+            raise SprintTransitionConditionMissing("Evidence approval threshold has not been met.")
+
+        with transaction.atomic():
+            locked_sprint = InterviewSprint.objects.select_for_update().get(pk=sprint.pk, user=user)
+            current_state = SprintState(locked_sprint.state)
+            if current_state == SprintState.EVIDENCE_APPROVED:
+                return locked_sprint
+            if current_state != SprintState.EVIDENCE_REVIEW:
+                raise InvalidSprintTransition(
+                    f"Cannot approve evidence while Sprint is in {current_state}."
+                )
+            locked_sprint.state = SprintState.EVIDENCE_APPROVED
+            locked_sprint.save(update_fields=["state", "updated_at"])
+            return locked_sprint
