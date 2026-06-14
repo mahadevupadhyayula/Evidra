@@ -8,13 +8,16 @@ from pydantic import ValidationError
 from ai.client import (
     AIClientError,
     CompanyContextExtractionClient,
+    EvidenceExtractionClient,
     JDAnalysisClient,
     OpenAICompanyContextClient,
+    OpenAIEvidenceClient,
     OpenAIJDClient,
     OpenAIProfileClient,
     ProfileExtractionClient,
 )
 from ai.schemas.company_context import CompanyContext
+from ai.schemas.evidence import ExtractedEvidenceSet
 from ai.schemas.jd import JDAnalysis
 from ai.schemas.profile import ExtractedProfile
 
@@ -29,6 +32,10 @@ class AIJDAnalysisError(RuntimeError):
 
 class AICompanyContextExtractionError(RuntimeError):
     """Raised when company context extraction cannot produce valid structured output."""
+
+
+class AIEvidenceExtractionError(RuntimeError):
+    """Raised when evidence extraction cannot produce valid structured output."""
 
 
 NUMERIC_CLAIM_PATTERN = re.compile(r"\b\d+(?:[,.]\d+)?%?\b")
@@ -71,7 +78,11 @@ def _has_unsupported_numeric_claim(value: str, normalized_resume: str) -> bool:
 @dataclass(frozen=True)
 class EvidraAIService:
     client: (
-        ProfileExtractionClient | JDAnalysisClient | CompanyContextExtractionClient | None
+        ProfileExtractionClient
+        | JDAnalysisClient
+        | CompanyContextExtractionClient
+        | EvidenceExtractionClient
+        | None
     ) = None
 
     def extract_profile(self, confirmed_resume_text: str) -> ExtractedProfile:
@@ -131,6 +142,42 @@ class EvidraAIService:
                 retry_context = str(exc)
         raise AICompanyContextExtractionError(
             "Company context extraction returned invalid structured output."
+        ) from last_error
+
+    def extract_evidence(
+        self,
+        *,
+        resume_text: str,
+        highlights: list[dict],
+        profile_context: dict,
+        opportunity_context: dict,
+    ) -> ExtractedEvidenceSet:
+        source_text = resume_text.strip()
+        if not source_text and not highlights:
+            raise AIEvidenceExtractionError("Resume text or highlights are required.")
+
+        client = self.client or OpenAIEvidenceClient()
+        if not hasattr(client, "extract_evidence"):
+            raise AIEvidenceExtractionError("Evidence extraction client is not configured.")
+
+        last_error: Exception | None = None
+        retry_context: str | None = None
+        for _attempt in range(2):
+            try:
+                raw_evidence = client.extract_evidence(
+                    resume_text=source_text,
+                    highlights=highlights,
+                    profile_context=profile_context,
+                    opportunity_context=opportunity_context,
+                    retry_context=retry_context,
+                )
+                evidence = ExtractedEvidenceSet.model_validate(raw_evidence)
+                return ground_evidence_in_sources(evidence, source_text, highlights)
+            except (AIClientError, ValidationError, ValueError) as exc:
+                last_error = exc
+                retry_context = str(exc)
+        raise AIEvidenceExtractionError(
+            "Evidence extraction returned invalid structured output."
         ) from last_error
 
     def analyze_jd(
@@ -261,3 +308,40 @@ def _company_context_field_values_are_supported(value: object, normalized_source
 
 def _normalize_grounding_text(value: object) -> str:
     return " ".join(re.sub(r"[^a-z0-9]+", " ", str(value).casefold()).split())
+
+
+def ground_evidence_in_sources(
+    evidence: ExtractedEvidenceSet, resume_text: str, highlights: list[dict]
+) -> ExtractedEvidenceSet:
+    normalized_resume = _normalize_grounding_text(resume_text)
+    highlights_by_id = {int(item["id"]): item for item in highlights if item.get("id") is not None}
+    grounded_cards = []
+    for card in evidence.cards:
+        normalized_excerpt = _normalize_grounding_text(card.source_excerpt)
+        if card.source_type == "resume":
+            if not normalized_excerpt or normalized_excerpt not in normalized_resume:
+                raise ValueError("Evidence source excerpts must appear in the confirmed resume.")
+            source_blob = normalized_resume
+        else:
+            highlight = highlights_by_id.get(int(card.source_highlight_id or 0))
+            if highlight is None:
+                raise ValueError("Highlight evidence must reference a provided highlight.")
+            source_blob = _normalize_grounding_text(
+                " ".join(
+                    str(highlight.get(field) or "")
+                    for field in ["title", "description", "metric", "source_note"]
+                )
+            )
+            if not normalized_excerpt or normalized_excerpt not in source_blob:
+                raise ValueError("Evidence source excerpts must appear in the source highlight.")
+
+        missing_details = list(card.missing_details)
+        metric = card.metric
+        if metric and _normalize_grounding_text(metric) not in source_blob:
+            metric = None
+            if "Confirm the metric for this evidence." not in missing_details:
+                missing_details.append("Confirm the metric for this evidence.")
+        grounded_cards.append(
+            card.model_copy(update={"metric": metric, "missing_details": missing_details})
+        )
+    return evidence.model_copy(update={"cards": grounded_cards})

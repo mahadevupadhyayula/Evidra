@@ -8,6 +8,7 @@ from django.conf import settings
 from openai import OpenAI
 
 from ai.schemas.company_context import CompanyContext
+from ai.schemas.evidence import ExtractedEvidenceSet
 from ai.schemas.jd import JDAnalysis
 from ai.schemas.profile import ExtractedProfile
 
@@ -31,6 +32,19 @@ class CompanyContextExtractionClient(Protocol):
         retry_context: str | None = None,
     ) -> dict:
         """Return raw company context data for schema validation."""
+
+
+class EvidenceExtractionClient(Protocol):
+    def extract_evidence(
+        self,
+        *,
+        resume_text: str,
+        highlights: list[dict],
+        profile_context: dict,
+        opportunity_context: dict,
+        retry_context: str | None = None,
+    ) -> dict:
+        """Return raw evidence data for schema validation."""
 
 
 class JDAnalysisClient(Protocol):
@@ -114,6 +128,57 @@ class MockAIClient:
             raise response
         return response
 
+    def extract_evidence(
+        self,
+        *,
+        resume_text: str,
+        highlights: list[dict],
+        profile_context: dict,
+        opportunity_context: dict,
+        retry_context: str | None = None,
+    ) -> dict:
+        self.calls.append(
+            {
+                "operation": "extract_evidence",
+                "resume_text": resume_text,
+                "highlights": highlights,
+                "profile_context": profile_context,
+                "opportunity_context": opportunity_context,
+                "retry_context": retry_context,
+            }
+        )
+        if not self.responses:
+            excerpt = resume_text[:80] or "Resume evidence"
+            return {
+                "cards": [
+                    {
+                        "title": "Evidence from resume",
+                        "problem": None,
+                        "role": None,
+                        "action": excerpt,
+                        "result": None,
+                        "metric": None,
+                        "skills": [],
+                        "competencies": [],
+                        "ownership_signal": None,
+                        "constraints": None,
+                        "tradeoffs": None,
+                        "missing_details": ["Add the measurable result."],
+                        "source_excerpt": excerpt,
+                        "source_location": "resume",
+                        "source_type": "resume",
+                        "source_highlight_id": None,
+                        "confidentiality_suggested": False,
+                        "duplicate_key": None,
+                        "duplicate_reason": None,
+                    }
+                ]
+            }
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
     def analyze_jd(
         self,
         *,
@@ -161,6 +226,59 @@ class MockAIClient:
         if isinstance(response, Exception):
             raise response
         return response
+
+
+class OpenAIEvidenceClient:
+    def __init__(self, *, api_key: str | None = None, model: str | None = None) -> None:
+        self.api_key = api_key if api_key is not None else settings.OPENAI_API_KEY
+        self.model = model or settings.EVIDRA_OPENAI_MODEL
+        if not self.api_key:
+            raise AIClientError("OpenAI API key is not configured.")
+        self.client = OpenAI(api_key=self.api_key)
+
+    def extract_evidence(
+        self,
+        *,
+        resume_text: str,
+        highlights: list[dict],
+        profile_context: dict,
+        opportunity_context: dict,
+        retry_context: str | None = None,
+    ) -> dict:
+        from ai.prompts.evidence import SYSTEM_PROMPT
+
+        prompt = SYSTEM_PROMPT
+        if retry_context:
+            prompt += f" Previous output was structurally invalid: {retry_context}."
+        user_payload = {
+            "resume_text": resume_text,
+            "highlights": highlights,
+            "profile_context": profile_context,
+            "opportunity_context": opportunity_context,
+        }
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "extracted_evidence",
+                        "schema": ExtractedEvidenceSet.model_json_schema(),
+                        "strict": True,
+                    },
+                },
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": json.dumps(user_payload)},
+                ],
+            )
+            content = response.choices[0].message.content or "{}"
+            parsed = json.loads(content)
+        except Exception as exc:  # noqa: BLE001
+            raise AIClientError("Evidence extraction failed.") from exc
+        if not isinstance(parsed, dict):
+            raise AIClientError("Evidence extraction returned invalid JSON.")
+        return parsed
 
 
 class OpenAIProfileClient:
