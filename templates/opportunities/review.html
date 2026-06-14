@@ -10,6 +10,7 @@
         <dt>Role family</dt><dd>{{ opportunity.get_role_family_display }}</dd>
         <dt>Seniority</dt><dd>{{ opportunity.target_seniority }}</dd>
         <dt>Company</dt><dd>{{ opportunity.company_name }}</dd>
+        {% if opportunity.company_url %}<dt>Company URL</dt><dd>{{ opportunity.company_url }}</dd>{% endif %}
         {% if opportunity.interview_stage %}<dt>Interview stage</dt><dd>{{ opportunity.interview_stage }}</dd>{% endif %}
         {% if opportunity.interview_date %}<dt>Interview date</dt><dd>{{ opportunity.interview_date }}</dd>{% endif %}
       </dl>
@@ -24,12 +25,54 @@
         <ul>{% for item in opportunity.jd_analysis.seniority_expectations %}<li>{{ item.expectation }}</li>{% endfor %}</ul>
         <h2>Likely themes</h2>
         <ul>{% for item in opportunity.jd_analysis.likely_themes %}<li>{{ item.theme }}</li>{% endfor %}</ul>
+
+        <hr>
+        <h2>Company context</h2>
+        <p>Optional. Evidra fetches at most one public URL you provide, or uses pasted context. It does not crawl, search, or perform broad web research.</p>
+        <p>Status: {{ opportunity.get_company_context_status_display }}</p>
+        {% if opportunity.company_context %}
+          <dl class="summary-list">
+            {% if opportunity.company_context.company_description %}<dt>Description</dt><dd>{{ opportunity.company_context.company_description }}</dd>{% endif %}
+            {% if opportunity.company_context.products_or_services %}<dt>Products/services</dt><dd>{{ opportunity.company_context.products_or_services|join:", " }}</dd>{% endif %}
+            {% if opportunity.company_context.target_users %}<dt>Target users</dt><dd>{{ opportunity.company_context.target_users|join:", " }}</dd>{% endif %}
+            {% if opportunity.company_context.business_model_clues %}<dt>Business model clues</dt><dd>{{ opportunity.company_context.business_model_clues|join:", " }}</dd>{% endif %}
+            {% if opportunity.company_context.product_terminology %}<dt>Terminology</dt><dd>{{ opportunity.company_context.product_terminology|join:", " }}</dd>{% endif %}
+            {% if opportunity.company_context.strategic_themes %}<dt>Strategic themes</dt><dd>{{ opportunity.company_context.strategic_themes|join:", " }}</dd>{% endif %}
+          </dl>
+          {% if sprint.state == "PROFILE_CONFIRMED" %}
+            <form method="post" action="{% url 'opportunities:company_context_review' opportunity.id %}">
+              {% csrf_token %}
+              {{ company_context_review_form.as_p }}
+              <button type="submit">Save company context edits</button>
+            </form>
+            {% if opportunity.company_context_status != "CONFIRMED" %}
+              <form method="post" action="{% url 'opportunities:company_context_confirm' opportunity.id %}">
+                {% csrf_token %}
+                <button type="submit">Confirm company context</button>
+              </form>
+            {% endif %}
+          {% endif %}
+        {% endif %}
+
         {% if sprint.state == "PROFILE_CONFIRMED" %}
-          <form method="post" action="{% url 'opportunities:opportunity_confirm' opportunity.id %}">
+          <form method="post" action="{% url 'opportunities:company_context_submit' opportunity.id %}">
             {% csrf_token %}
-            <button type="submit">Confirm opportunity</button>
+            {{ company_context_form.as_p }}
+            <button type="submit">Extract company context</button>
           </form>
-          <p><a href="{% url 'opportunities:opportunity_detail' %}?edit=1">Edit and re-analyze</a></p>
+          <form method="post" action="{% url 'opportunities:company_context_skip' opportunity.id %}">
+            {% csrf_token %}
+            <button type="submit">Continue without company context</button>
+          </form>
+          {% if opportunity.company_context_status == "CONFIRMED" or opportunity.company_context_status == "SKIPPED" %}
+            <form method="post" action="{% url 'opportunities:opportunity_confirm' opportunity.id %}">
+              {% csrf_token %}
+              <button type="submit">Confirm opportunity</button>
+            </form>
+          {% else %}
+            <p>Confirm company context or choose continue without company context before confirming the opportunity.</p>
+          {% endif %}
+          <p><a href="{% url 'opportunities:opportunity_detail' %}?edit=1">Edit and re-analyze JD</a></p>
         {% endif %}
       {% else %}
         <p>This opportunity has not been analyzed yet.</p>

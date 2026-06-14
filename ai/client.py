@@ -7,6 +7,7 @@ from typing import Protocol
 from django.conf import settings
 from openai import OpenAI
 
+from ai.schemas.company_context import CompanyContext
 from ai.schemas.jd import JDAnalysis
 from ai.schemas.profile import ExtractedProfile
 
@@ -18,6 +19,18 @@ class AIClientError(RuntimeError):
 class ProfileExtractionClient(Protocol):
     def extract_profile(self, *, resume_text: str, retry_context: str | None = None) -> dict:
         """Return raw profile data for schema validation."""
+
+
+class CompanyContextExtractionClient(Protocol):
+    def extract_company_context(
+        self,
+        *,
+        source_text: str,
+        source_type: str,
+        source_url: str | None = None,
+        retry_context: str | None = None,
+    ) -> dict:
+        """Return raw company context data for schema validation."""
 
 
 class JDAnalysisClient(Protocol):
@@ -54,6 +67,46 @@ class MockAIClient:
                 "education_summary": None,
                 "career_summary": None,
                 "positioning_summary": None,
+                "uncertain_fields": [],
+            }
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    def extract_company_context(
+        self,
+        *,
+        source_text: str,
+        source_type: str,
+        source_url: str | None = None,
+        retry_context: str | None = None,
+    ) -> dict:
+        self.calls.append(
+            {
+                "operation": "extract_company_context",
+                "source_text": source_text,
+                "source_type": source_type,
+                "source_url": source_url,
+                "retry_context": retry_context,
+            }
+        )
+        if not self.responses:
+            return {
+                "source_type": source_type,
+                "source_url": source_url,
+                "company_description": source_text[:80] or "company",
+                "products_or_services": [],
+                "target_users": [],
+                "business_model_clues": [],
+                "product_terminology": [],
+                "strategic_themes": [],
+                "source_references": [
+                    {
+                        "field": "company_description",
+                        "source_excerpt": source_text[:80] or "company",
+                    }
+                ],
                 "uncertain_fields": [],
             }
         response = self.responses.pop(0)
@@ -203,4 +256,55 @@ class OpenAIJDClient:
             raise AIClientError("JD analysis failed.") from exc
         if not isinstance(parsed, dict):
             raise AIClientError("JD analysis returned invalid JSON.")
+        return parsed
+
+
+class OpenAICompanyContextClient:
+    def __init__(self, *, api_key: str | None = None, model: str | None = None) -> None:
+        self.api_key = api_key if api_key is not None else settings.OPENAI_API_KEY
+        self.model = model or settings.EVIDRA_OPENAI_MODEL
+        if not self.api_key:
+            raise AIClientError("OpenAI API key is not configured.")
+        self.client = OpenAI(api_key=self.api_key)
+
+    def extract_company_context(
+        self,
+        *,
+        source_text: str,
+        source_type: str,
+        source_url: str | None = None,
+        retry_context: str | None = None,
+    ) -> dict:
+        from ai.prompts.company_context import SYSTEM_PROMPT
+
+        prompt = SYSTEM_PROMPT
+        if retry_context:
+            prompt += f" Previous output was structurally invalid: {retry_context}."
+        user_payload = {
+            "source_type": source_type,
+            "source_url": source_url,
+            "source_text": source_text,
+        }
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "company_context",
+                        "schema": CompanyContext.model_json_schema(),
+                        "strict": True,
+                    },
+                },
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": json.dumps(user_payload)},
+                ],
+            )
+            content = response.choices[0].message.content or "{}"
+            parsed = json.loads(content)
+        except Exception as exc:  # noqa: BLE001
+            raise AIClientError("Company context extraction failed.") from exc
+        if not isinstance(parsed, dict):
+            raise AIClientError("Company context extraction returned invalid JSON.")
         return parsed

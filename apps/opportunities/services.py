@@ -7,8 +7,10 @@ from django.db import IntegrityError, transaction
 from django.http import Http404
 from django.utils import timezone
 
-from ai.services import AIJDAnalysisError, EvidraAIService
-from apps.opportunities.models import Opportunity, OpportunityStatus
+from ai.schemas.company_context import CompanyContext
+from ai.services import AICompanyContextExtractionError, AIJDAnalysisError, EvidraAIService
+from apps.opportunities.company_context import CompanyContextFetcher, CompanyContextFetchError
+from apps.opportunities.models import CompanyContextStatus, Opportunity, OpportunityStatus
 from apps.opportunities.role_packs import get_role_pack, role_pack_as_prompt_context
 from apps.sprints.models import InterviewSprint, SprintState
 from apps.sprints.services import (
@@ -129,7 +131,133 @@ class OpportunityService:
         except AIJDAnalysisError:
             raise
         opportunity.jd_analysis = analysis.model_dump(mode="json")
-        opportunity.save(update_fields=["jd_analysis", "updated_at"])
+        update_fields = ["jd_analysis", "updated_at"]
+        if (
+            opportunity.company_context
+            and opportunity.company_context_status == CompanyContextStatus.CONFIRMED
+        ):
+            opportunity.company_context_status = CompanyContextStatus.PENDING_REVIEW
+            update_fields.append("company_context_status")
+        opportunity.save(update_fields=update_fields)
+        return opportunity
+
+    @staticmethod
+    def extract_company_context_from_url(
+        *,
+        user,
+        sprint: InterviewSprint,
+        opportunity_id,
+        company_url: str,
+        fetcher: CompanyContextFetcher | None = None,
+        ai_service: EvidraAIService | None = None,
+    ) -> Opportunity:
+        opportunity = OpportunityService._get_editable_opportunity(
+            user=user, sprint=sprint, opportunity_id=opportunity_id
+        )
+        try:
+            fetch_result = (fetcher or CompanyContextFetcher()).fetch(company_url)
+            context = (ai_service or EvidraAIService()).extract_company_context(
+                source_text=fetch_result.visible_text,
+                source_type="url",
+                source_url=fetch_result.final_url,
+            )
+        except (CompanyContextFetchError, AICompanyContextExtractionError):
+            opportunity.company_context_status = CompanyContextStatus.FAILED
+            opportunity.save(update_fields=["company_context_status", "updated_at"])
+            raise
+        opportunity.company_url = fetch_result.final_url
+        opportunity.company_context = context.model_dump(mode="json")
+        opportunity.company_context_status = CompanyContextStatus.PENDING_REVIEW
+        opportunity.save(
+            update_fields=[
+                "company_url",
+                "company_context",
+                "company_context_status",
+                "updated_at",
+            ]
+        )
+        return opportunity
+
+    @staticmethod
+    def extract_company_context_from_paste(
+        *,
+        user,
+        sprint: InterviewSprint,
+        opportunity_id,
+        pasted_company_context: str,
+        ai_service: EvidraAIService | None = None,
+    ) -> Opportunity:
+        opportunity = OpportunityService._get_editable_opportunity(
+            user=user, sprint=sprint, opportunity_id=opportunity_id
+        )
+        try:
+            context = (ai_service or EvidraAIService()).extract_company_context(
+                source_text=pasted_company_context,
+                source_type="paste",
+                source_url=None,
+            )
+        except AICompanyContextExtractionError:
+            opportunity.company_context_status = CompanyContextStatus.FAILED
+            opportunity.save(update_fields=["company_context_status", "updated_at"])
+            raise
+        opportunity.company_url = ""
+        opportunity.company_context = context.model_dump(mode="json")
+        opportunity.company_context_status = CompanyContextStatus.PENDING_REVIEW
+        opportunity.save(
+            update_fields=[
+                "company_url",
+                "company_context",
+                "company_context_status",
+                "updated_at",
+            ]
+        )
+        return opportunity
+
+
+
+    @staticmethod
+    def update_company_context_review(
+        *, user, sprint: InterviewSprint, opportunity_id, company_context_payload: dict[str, Any]
+    ) -> Opportunity:
+        opportunity = OpportunityService._get_editable_opportunity(
+            user=user, sprint=sprint, opportunity_id=opportunity_id
+        )
+        if not opportunity.company_context:
+            raise OpportunityError("Extract or paste company context before reviewing it.")
+        reviewed_payload = {
+            **company_context_payload,
+            "source_type": opportunity.company_context.get("source_type") or "paste",
+            "source_url": opportunity.company_context.get("source_url"),
+            "source_references": [],
+        }
+        context = CompanyContext.model_validate(reviewed_payload)
+        opportunity.company_context = context.model_dump(mode="json")
+        opportunity.company_context_status = CompanyContextStatus.PENDING_REVIEW
+        opportunity.save(update_fields=["company_context", "company_context_status", "updated_at"])
+        return opportunity
+
+    @staticmethod
+    def confirm_company_context(*, user, sprint: InterviewSprint, opportunity_id) -> Opportunity:
+        opportunity = OpportunityService._get_editable_opportunity(
+            user=user, sprint=sprint, opportunity_id=opportunity_id
+        )
+        if not opportunity.company_context:
+            raise OpportunityError("Review extracted company context before confirming it.")
+        opportunity.company_context_status = CompanyContextStatus.CONFIRMED
+        opportunity.save(update_fields=["company_context_status", "updated_at"])
+        return opportunity
+
+    @staticmethod
+    def skip_company_context(*, user, sprint: InterviewSprint, opportunity_id) -> Opportunity:
+        opportunity = OpportunityService._get_editable_opportunity(
+            user=user, sprint=sprint, opportunity_id=opportunity_id
+        )
+        if opportunity.company_context_status == CompanyContextStatus.CONFIRMED:
+            raise OpportunityError(
+                "Confirmed company context cannot be skipped without editing it."
+            )
+        opportunity.company_context_status = CompanyContextStatus.SKIPPED
+        opportunity.save(update_fields=["company_context_status", "updated_at"])
         return opportunity
 
     @staticmethod
@@ -198,3 +326,25 @@ class OpportunityService:
         ]
         if missing_fields or not opportunity.jd_analysis:
             raise OpportunityError("Analyze and review the opportunity before confirming it.")
+        if opportunity.company_context_status not in {
+            CompanyContextStatus.CONFIRMED,
+            CompanyContextStatus.SKIPPED,
+        }:
+            raise OpportunityError(
+                "Confirm company context or choose continue without company context "
+                "before confirming."
+            )
+
+    @staticmethod
+    def _get_editable_opportunity(*, user, sprint: InterviewSprint, opportunity_id) -> Opportunity:
+        OpportunityService._require_opportunity_stage_ready(user=user, sprint=sprint)
+        opportunity = (
+            Opportunity.objects.select_related("sprint")
+            .filter(pk=opportunity_id, sprint__user=user, sprint=sprint)
+            .first()
+        )
+        if opportunity is None:
+            raise Http404("Opportunity not found.")
+        if not opportunity.jd_analysis:
+            raise OpportunityError("Analyze the job description before company context.")
+        return opportunity
