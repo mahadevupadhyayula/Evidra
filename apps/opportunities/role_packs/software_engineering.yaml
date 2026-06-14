@@ -1,0 +1,23 @@
+key: SOFTWARE_ENGINEERING
+label: Software Engineering
+competencies:
+  - System design
+  - Code quality
+  - Debugging
+  - Delivery ownership
+  - Collaboration
+skills:
+  - API design
+  - Testing
+  - Data modeling
+  - Performance reasoning
+  - Operational awareness
+seniority_expectations:
+  - Designs maintainable systems
+  - Communicates tradeoffs clearly
+  - Owns quality from implementation through operation
+likely_themes:
+  - Technical depth
+  - Reliability
+  - Architecture tradeoffs
+  - Team execution

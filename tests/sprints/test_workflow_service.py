@@ -134,3 +134,38 @@ def test_transition_rejects_cross_user_mutation():
 
     sprint.refresh_from_db()
     assert sprint.state == SprintState.DRAFT
+
+
+@pytest.mark.django_db
+def test_mark_opportunity_confirmed_rejects_unconfirmed_opportunity():
+    from apps.opportunities.models import Opportunity
+    from tests.opportunities.helpers import make_profile_confirmed_sprint, opportunity_data
+
+    user, sprint, _profile = make_profile_confirmed_sprint("opportunity-transition@example.com")
+    opportunity = Opportunity.objects.create(sprint=sprint, **opportunity_data())
+
+    with pytest.raises(SprintTransitionConditionMissing):
+        SprintWorkflowService.mark_opportunity_confirmed(
+            user=user,
+            sprint=sprint,
+            opportunity=opportunity,
+        )
+
+    sprint.refresh_from_db()
+    assert sprint.state == SprintState.PROFILE_CONFIRMED
+
+
+@pytest.mark.django_db
+def test_generic_transition_still_fails_closed_for_opportunity_confirmed():
+    user = get_user_model().objects.create_user(username="generic-opportunity@example.com")
+    sprint = InterviewSprint.objects.create(user=user, state=SprintState.PROFILE_CONFIRMED)
+
+    with pytest.raises(SprintTransitionConditionMissing):
+        SprintWorkflowService.transition(
+            user=user,
+            sprint=sprint,
+            to_state=SprintState.OPPORTUNITY_CONFIRMED,
+        )
+
+    sprint.refresh_from_db()
+    assert sprint.state == SprintState.PROFILE_CONFIRMED

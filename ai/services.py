@@ -5,12 +5,23 @@ from dataclasses import dataclass
 
 from pydantic import ValidationError
 
-from ai.client import AIClientError, OpenAIProfileClient, ProfileExtractionClient
+from ai.client import (
+    AIClientError,
+    JDAnalysisClient,
+    OpenAIJDClient,
+    OpenAIProfileClient,
+    ProfileExtractionClient,
+)
+from ai.schemas.jd import JDAnalysis
 from ai.schemas.profile import ExtractedProfile
 
 
 class AIProfileExtractionError(RuntimeError):
     """Raised when profile extraction cannot produce valid structured output."""
+
+
+class AIJDAnalysisError(RuntimeError):
+    """Raised when JD analysis cannot produce valid structured output."""
 
 
 NUMERIC_CLAIM_PATTERN = re.compile(r"\b\d+(?:[,.]\d+)?%?\b")
@@ -52,7 +63,7 @@ def _has_unsupported_numeric_claim(value: str, normalized_resume: str) -> bool:
 
 @dataclass(frozen=True)
 class EvidraAIService:
-    client: ProfileExtractionClient | None = None
+    client: ProfileExtractionClient | JDAnalysisClient | None = None
 
     def extract_profile(self, confirmed_resume_text: str) -> ExtractedProfile:
         resume_text = confirmed_resume_text.strip()
@@ -76,3 +87,87 @@ class EvidraAIService:
         raise AIProfileExtractionError(
             "Profile extraction returned invalid structured output."
         ) from last_error
+
+    def analyze_jd(
+        self,
+        *,
+        job_description: str,
+        role_title: str,
+        role_family: str,
+        target_seniority: str,
+        role_pack: dict,
+    ) -> JDAnalysis:
+        jd_text = job_description.strip()
+        if not jd_text:
+            raise AIJDAnalysisError("Job description is required.")
+
+        client = self.client or OpenAIJDClient()
+        if not hasattr(client, "analyze_jd"):
+            raise AIJDAnalysisError("JD analysis client is not configured.")
+
+        last_error: Exception | None = None
+        retry_context: str | None = None
+        for _attempt in range(2):
+            try:
+                raw_analysis = client.analyze_jd(
+                    job_description=jd_text,
+                    role_title=role_title.strip(),
+                    role_family=role_family,
+                    target_seniority=target_seniority.strip(),
+                    role_pack=role_pack,
+                    retry_context=retry_context,
+                )
+                analysis = JDAnalysis.model_validate(raw_analysis)
+                return ground_jd_analysis_in_jd(analysis, jd_text)
+            except (AIClientError, ValidationError, ValueError) as exc:
+                last_error = exc
+                retry_context = str(exc)
+        raise AIJDAnalysisError("JD analysis returned invalid structured output.") from last_error
+
+
+def ground_jd_analysis_in_jd(analysis: JDAnalysis, job_description: str) -> JDAnalysis:
+    normalized_jd = job_description.casefold()
+    return analysis.model_copy(
+        update={
+            "competencies": [
+                item.model_copy(
+                    update={
+                        "source_excerpt": _valid_source_excerpt(item.source_excerpt, normalized_jd)
+                    }
+                )
+                for item in analysis.competencies
+            ],
+            "skills": [
+                item.model_copy(
+                    update={
+                        "source_excerpt": _valid_source_excerpt(item.source_excerpt, normalized_jd)
+                    }
+                )
+                for item in analysis.skills
+            ],
+            "seniority_expectations": [
+                item.model_copy(
+                    update={
+                        "source_excerpt": _valid_source_excerpt(item.source_excerpt, normalized_jd)
+                    }
+                )
+                for item in analysis.seniority_expectations
+            ],
+            "likely_themes": [
+                item.model_copy(
+                    update={
+                        "source_excerpt": _valid_source_excerpt(item.source_excerpt, normalized_jd)
+                    }
+                )
+                for item in analysis.likely_themes
+            ],
+        }
+    )
+
+
+def _valid_source_excerpt(source_excerpt: str | None, normalized_jd: str) -> str | None:
+    if not source_excerpt:
+        return None
+    if source_excerpt.casefold() in normalized_jd:
+        return source_excerpt
+    return None

@@ -1,0 +1,23 @@
+key: DATA_ANALYTICS
+label: Data and Analytics
+competencies:
+  - Analytical problem solving
+  - Data storytelling
+  - Metrics design
+  - Statistical reasoning
+  - Business partnership
+skills:
+  - SQL
+  - Dashboarding
+  - Experiment analysis
+  - Data quality checks
+  - Insight communication
+seniority_expectations:
+  - Connects analysis to business decisions
+  - Identifies limitations and data quality risks
+  - Communicates actionable recommendations
+likely_themes:
+  - Metrics and KPIs
+  - Data interpretation
+  - Decision support
+  - Stakeholder alignment

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Review opportunity · Evidra{% endblock %}
+{% block content %}
+  <section class="card">
+    <p class="eyebrow">Opportunity</p>
+    <h1>Review your opportunity context</h1>
+    {% if opportunity %}
+      <dl class="summary-list">
+        <dt>Role title</dt><dd>{{ opportunity.role_title }}</dd>
+        <dt>Role family</dt><dd>{{ opportunity.get_role_family_display }}</dd>
+        <dt>Seniority</dt><dd>{{ opportunity.target_seniority }}</dd>
+        <dt>Company</dt><dd>{{ opportunity.company_name }}</dd>
+        {% if opportunity.interview_stage %}<dt>Interview stage</dt><dd>{{ opportunity.interview_stage }}</dd>{% endif %}
+        {% if opportunity.interview_date %}<dt>Interview date</dt><dd>{{ opportunity.interview_date }}</dd>{% endif %}
+      </dl>
+      {% if opportunity.jd_analysis %}
+        <h2>JD summary</h2>
+        <p>{{ opportunity.jd_analysis.summary }}</p>
+        <h2>Competencies</h2>
+        <ul>{% for item in opportunity.jd_analysis.competencies %}<li>{{ item.name }}{% if item.description %}: {{ item.description }}{% endif %}</li>{% endfor %}</ul>
+        <h2>Skills</h2>
+        <ul>{% for item in opportunity.jd_analysis.skills %}<li>{{ item.name }} ({{ item.category }})</li>{% endfor %}</ul>
+        <h2>Seniority expectations</h2>
+        <ul>{% for item in opportunity.jd_analysis.seniority_expectations %}<li>{{ item.expectation }}</li>{% endfor %}</ul>
+        <h2>Likely themes</h2>
+        <ul>{% for item in opportunity.jd_analysis.likely_themes %}<li>{{ item.theme }}</li>{% endfor %}</ul>
+        {% if sprint.state == "PROFILE_CONFIRMED" %}
+          <form method="post" action="{% url 'opportunities:opportunity_confirm' opportunity.id %}">
+            {% csrf_token %}
+            <button type="submit">Confirm opportunity</button>
+          </form>
+          <p><a href="{% url 'opportunities:opportunity_detail' %}?edit=1">Edit and re-analyze</a></p>
+        {% endif %}
+      {% else %}
+        <p>This opportunity has not been analyzed yet.</p>
+        <p><a class="button-link" href="{% url 'opportunities:opportunity_detail' %}">Analyze job description</a></p>
+      {% endif %}
+    {% else %}
+      <p>No opportunity context has been added yet.</p>
+      <p><a class="button-link" href="{% url 'opportunities:opportunity_detail' %}">Add opportunity context</a></p>
+    {% endif %}
+  </section>
+{% endblock %}
