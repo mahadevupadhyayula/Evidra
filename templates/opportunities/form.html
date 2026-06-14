@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Opportunity context · Evidra{% endblock %}
+{% block content %}
+  <section class="card">
+    <p class="eyebrow">Opportunity</p>
+    <h1>Add your target role</h1>
+    <p>Paste the job description and add role context. We analyze only what you provide here and the fixed role pack for your selected family.</p>
+    <form method="post" action="{% url 'opportunities:opportunity_analyze' %}">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit">Analyze job description</button>
+    </form>
+    {% if opportunity and opportunity.jd_analysis %}
+      <hr>
+      <h2>Current JD analysis</h2>
+      <p>{{ opportunity.jd_analysis.summary }}</p>
+      <p><a class="button-link" href="{% url 'opportunities:opportunity_detail' %}">Review analysis</a></p>
+    {% endif %}
+  </section>
+{% endblock %}

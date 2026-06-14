@@ -1,0 +1,23 @@
+key: PRODUCT_MANAGEMENT
+label: Product Management
+competencies:
+  - Customer discovery
+  - Product strategy
+  - Prioritization
+  - Roadmapping
+  - Cross-functional leadership
+skills:
+  - User research
+  - Experimentation
+  - Metrics definition
+  - Stakeholder management
+  - Product analytics
+seniority_expectations:
+  - Defines ambiguous product problems clearly
+  - Balances customer, business, and technical tradeoffs
+  - Leads teams without relying only on authority
+likely_themes:
+  - Customer problems
+  - Prioritization decisions
+  - Product outcomes
+  - Collaboration with engineering and design

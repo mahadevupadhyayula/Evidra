@@ -106,11 +106,7 @@ class SprintWorkflowService:
 
     @staticmethod
     def mark_resume_ready(*, user, sprint: InterviewSprint, document) -> InterviewSprint:
-        if (
-            not user.is_authenticated
-            or sprint.user_id != user.id
-            or document.user_id != user.id
-        ):
+        if not user.is_authenticated or sprint.user_id != user.id or document.user_id != user.id:
             raise SprintOwnershipError("Sprint or resume is not owned by this user.")
         has_confirmed_resume = (
             document.is_active
@@ -145,11 +141,7 @@ class SprintWorkflowService:
 
     @staticmethod
     def mark_profile_confirmed(*, user, sprint: InterviewSprint, profile) -> InterviewSprint:
-        if (
-            not user.is_authenticated
-            or sprint.user_id != user.id
-            or profile.user_id != user.id
-        ):
+        if not user.is_authenticated or sprint.user_id != user.id or profile.user_id != user.id:
             raise SprintOwnershipError("Sprint or profile is not owned by this user.")
         has_confirmed_profile = (
             profile.confirmation_status == "CONFIRMED"
@@ -184,4 +176,45 @@ class SprintWorkflowService:
             locked_sprint.active_profile = profile
             locked_sprint.state = SprintState.PROFILE_CONFIRMED
             locked_sprint.save(update_fields=["active_profile", "state", "updated_at"])
+            return locked_sprint
+
+    @staticmethod
+    def mark_opportunity_confirmed(
+        *, user, sprint: InterviewSprint, opportunity
+    ) -> InterviewSprint:
+        if (
+            not user.is_authenticated
+            or sprint.user_id != user.id
+            or opportunity.sprint_id != sprint.id
+            or opportunity.sprint.user_id != user.id
+        ):
+            raise SprintOwnershipError("Sprint or opportunity is not owned by this user.")
+        has_confirmed_opportunity = (
+            opportunity.confirmation_status == "CONFIRMED"
+            and bool(opportunity.role_family)
+            and bool(opportunity.job_description.strip())
+            and bool(opportunity.jd_analysis)
+        )
+        if not has_confirmed_opportunity:
+            raise SprintTransitionConditionMissing("A confirmed analyzed opportunity is required.")
+
+        with transaction.atomic():
+            locked_sprint = InterviewSprint.objects.select_for_update().get(
+                pk=sprint.pk,
+                user=user,
+            )
+            current_state = SprintState(locked_sprint.state)
+            if current_state == SprintState.OPPORTUNITY_CONFIRMED:
+                return locked_sprint
+            if current_state != SprintState.PROFILE_CONFIRMED:
+                raise InvalidSprintTransition(
+                    f"Cannot mark opportunity confirmed while Sprint is in {current_state}."
+                )
+            if locked_sprint.active_profile_id is None:
+                raise SprintTransitionConditionMissing(
+                    "A confirmed active profile is required before opportunity confirmation."
+                )
+
+            locked_sprint.state = SprintState.OPPORTUNITY_CONFIRMED
+            locked_sprint.save(update_fields=["state", "updated_at"])
             return locked_sprint

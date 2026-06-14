@@ -1,0 +1,23 @@
+key: AI_PRODUCT_MANAGEMENT
+label: AI Product Management
+competencies:
+  - AI product strategy
+  - User problem framing
+  - Model evaluation literacy
+  - Responsible AI judgment
+  - Cross-functional execution
+skills:
+  - Prompt and workflow design
+  - Evaluation metrics
+  - Data quality reasoning
+  - Experimentation
+  - Stakeholder communication
+seniority_expectations:
+  - Separates user value from model novelty
+  - Understands model limitations and risk controls
+  - Defines measurable AI product outcomes
+likely_themes:
+  - AI use cases
+  - Evaluation and quality
+  - User trust and safety
+  - Data and model tradeoffs
