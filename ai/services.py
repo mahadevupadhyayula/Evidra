@@ -14,12 +14,16 @@ from ai.client import (
     OpenAIEvidenceClient,
     OpenAIJDClient,
     OpenAIProfileClient,
+    OpenAIStoryClient,
     ProfileExtractionClient,
+    StoryGenerationClient,
+    StoryScoringClient,
 )
 from ai.schemas.company_context import CompanyContext
 from ai.schemas.evidence import ExtractedEvidenceSet
 from ai.schemas.jd import JDAnalysis
 from ai.schemas.profile import ExtractedProfile
+from ai.schemas.stories import GeneratedStorySet, StoryScoreSet
 
 
 class AIProfileExtractionError(RuntimeError):
@@ -36,6 +40,14 @@ class AICompanyContextExtractionError(RuntimeError):
 
 class AIEvidenceExtractionError(RuntimeError):
     """Raised when evidence extraction cannot produce valid structured output."""
+
+
+class AIStoryGenerationError(RuntimeError):
+    """Raised when story generation cannot produce valid structured output."""
+
+
+class AIStoryScoringError(RuntimeError):
+    """Raised when story scoring cannot produce valid structured output."""
 
 
 NUMERIC_CLAIM_PATTERN = re.compile(r"\b\d+(?:[,.]\d+)?%?\b")
@@ -82,6 +94,8 @@ class EvidraAIService:
         | JDAnalysisClient
         | CompanyContextExtractionClient
         | EvidenceExtractionClient
+        | StoryGenerationClient
+        | StoryScoringClient
         | None
     ) = None
 
@@ -178,6 +192,76 @@ class EvidraAIService:
                 retry_context = str(exc)
         raise AIEvidenceExtractionError(
             "Evidence extraction returned invalid structured output."
+        ) from last_error
+
+    def generate_stories(
+        self,
+        *,
+        approved_evidence: list[dict],
+        profile_context: dict,
+    ) -> GeneratedStorySet:
+        if not approved_evidence:
+            raise AIStoryGenerationError("Approved evidence is required for story generation.")
+
+        client = self.client or OpenAIStoryClient()
+        if not hasattr(client, "generate_stories"):
+            raise AIStoryGenerationError("Story generation client is not configured.")
+
+        evidence_ids = {int(item["id"]) for item in approved_evidence}
+        evidence_text = _approved_evidence_grounding_text(approved_evidence)
+        last_error: Exception | None = None
+        retry_context: str | None = None
+        for _attempt in range(2):
+            try:
+                raw_stories = client.generate_stories(
+                    approved_evidence=approved_evidence,
+                    profile_context=profile_context,
+                    retry_context=retry_context,
+                )
+                stories = GeneratedStorySet.model_validate(raw_stories)
+                _validate_story_references(stories, evidence_ids)
+                _validate_story_numeric_claims(stories, evidence_text)
+                return stories
+            except (AIClientError, ValidationError, ValueError) as exc:
+                last_error = exc
+                retry_context = str(exc)
+        raise AIStoryGenerationError(
+            "Story generation returned invalid structured output."
+        ) from last_error
+
+    def score_stories(
+        self,
+        *,
+        stories: list[dict],
+        approved_evidence: list[dict],
+    ) -> StoryScoreSet:
+        if not stories:
+            raise AIStoryScoringError("Stories are required for scoring.")
+
+        client = self.client or OpenAIStoryClient()
+        if not hasattr(client, "score_stories"):
+            raise AIStoryScoringError("Story scoring client is not configured.")
+
+        story_ids = {str(item["client_story_id"]) for item in stories}
+        last_error: Exception | None = None
+        retry_context: str | None = None
+        for _attempt in range(2):
+            try:
+                raw_scores = client.score_stories(
+                    stories=stories,
+                    approved_evidence=approved_evidence,
+                    retry_context=retry_context,
+                )
+                scores = StoryScoreSet.model_validate(raw_scores)
+                score_ids = {score.client_story_id for score in scores.scores}
+                if score_ids != story_ids:
+                    raise ValueError("Story scoring must cover each generated story exactly once.")
+                return scores
+            except (AIClientError, ValidationError, ValueError) as exc:
+                last_error = exc
+                retry_context = str(exc)
+        raise AIStoryScoringError(
+            "Story scoring returned invalid structured output."
         ) from last_error
 
     def analyze_jd(
@@ -345,3 +429,59 @@ def ground_evidence_in_sources(
             card.model_copy(update={"metric": metric, "missing_details": missing_details})
         )
     return evidence.model_copy(update={"cards": grounded_cards})
+
+
+def _approved_evidence_grounding_text(approved_evidence: list[dict]) -> str:
+    parts: list[str] = []
+    for item in approved_evidence:
+        for field in [
+            "title",
+            "problem",
+            "role",
+            "action",
+            "result",
+            "metric",
+            "ownership_signal",
+            "constraints",
+            "tradeoffs",
+            "source_excerpt",
+        ]:
+            value = item.get(field)
+            if value:
+                parts.append(str(value))
+    return _normalize_grounding_text(" ".join(parts))
+
+
+def _validate_story_references(stories: GeneratedStorySet, evidence_ids: set[int]) -> None:
+    for story in stories.stories:
+        if not story.evidence_ids:
+            raise ValueError("Stories must reference approved evidence.")
+        unknown_ids = set(story.evidence_ids) - evidence_ids
+        if unknown_ids:
+            raise ValueError("Stories must reference only provided approved evidence.")
+
+
+def _validate_story_numeric_claims(
+    stories: GeneratedStorySet, normalized_evidence_text: str
+) -> None:
+    for story in stories.stories:
+        for value in [
+            story.situation,
+            story.task,
+            story.action,
+            story.result,
+            story.learning,
+            story.short_answer,
+            story.ninety_second_answer,
+            story.detailed_answer,
+        ]:
+            if value and _has_unsupported_story_numeric_claim(value, normalized_evidence_text):
+                raise ValueError("Story numeric claims must trace to approved evidence.")
+
+
+def _has_unsupported_story_numeric_claim(value: str, normalized_evidence_text: str) -> bool:
+    for match in NUMERIC_CLAIM_PATTERN.finditer(value):
+        normalized_claim = _normalize_grounding_text(match.group(0))
+        if normalized_claim and normalized_claim not in normalized_evidence_text:
+            return True
+    return False

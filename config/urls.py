@@ -17,5 +17,6 @@ urlpatterns = [
     path("workspace/opportunity/", include("apps.opportunities.urls")),
     path("workspace/profile/", include("apps.profiles.urls")),
     path("workspace/resume/", include("apps.documents.urls")),
+    path("workspace/stories/", include("apps.stories.urls")),
     path("workspace/", include("apps.workspace.urls")),
 ]

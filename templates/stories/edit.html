@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Edit story · Evidra{% endblock %}
+{% block content %}
+  <section class="card">
+    <p class="eyebrow">Reusable stories</p>
+    <h1>Edit story</h1>
+    <form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit">Save story</button>
+    </form>
+    <p><a href="{% url 'stories:story_bank' %}">Back to story bank</a></p>
+  </section>
+{% endblock %}

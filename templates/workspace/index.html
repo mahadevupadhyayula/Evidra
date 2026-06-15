@@ -23,7 +23,11 @@
         <p>Your opportunity is confirmed. Review and approve career evidence next.</p>
         <p><a class="button-link" href="{% url 'evidence:evidence_review' %}">Review evidence</a></p>
       {% elif sprint.state == "EVIDENCE_APPROVED" %}
-        <p>Your evidence is approved. Story generation is intentionally not part of this stage.</p>
+        <p>Your evidence is approved. Generate reusable interview stories next.</p>
+        <p><a class="button-link" href="{% url 'stories:story_bank' %}">Generate reusable stories</a></p>
+      {% elif sprint.state == "STORIES_READY" %}
+        <p>Your reusable story bank is ready.</p>
+        <p><a class="button-link" href="{% url 'stories:story_bank' %}">Review story bank</a></p>
       {% endif %}
       <dl class="summary-list">
         <dt>Sprint ID</dt>
