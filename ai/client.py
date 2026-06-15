@@ -10,6 +10,7 @@ from openai import OpenAI
 from ai.schemas.company_context import CompanyContext
 from ai.schemas.evidence import ExtractedEvidenceSet
 from ai.schemas.jd import JDAnalysis
+from ai.schemas.matching import StoryMatchSet
 from ai.schemas.profile import ExtractedProfile
 from ai.schemas.stories import GeneratedStorySet, StoryScoreSet
 
@@ -68,6 +69,20 @@ class StoryScoringClient(Protocol):
         retry_context: str | None = None,
     ) -> dict:
         """Return raw story score data for schema validation."""
+
+
+class StoryMatchScoringClient(Protocol):
+    def score_story_matches(
+        self,
+        *,
+        opportunity_context: dict,
+        role_pack: dict,
+        competency_map: list[dict],
+        stories: list[dict],
+        approved_evidence: list[dict],
+        retry_context: str | None = None,
+    ) -> dict:
+        """Return raw story-match component scores for schema validation."""
 
 
 class JDAnalysisClient(Protocol):
@@ -222,9 +237,7 @@ class MockAIClient:
             evidence_id = int(evidence["id"])
             action = evidence.get("action") or evidence.get("source_excerpt") or "I led the work."
             result = (
-                evidence.get("result")
-                or evidence.get("metric")
-                or "The work improved outcomes."
+                evidence.get("result") or evidence.get("metric") or "The work improved outcomes."
             )
             return {
                 "stories": [
@@ -280,6 +293,55 @@ class MockAIClient:
                         "scoring_notes": None,
                     }
                     for story in stories
+                ]
+            }
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    def score_story_matches(
+        self,
+        *,
+        opportunity_context: dict,
+        role_pack: dict,
+        competency_map: list[dict],
+        stories: list[dict],
+        approved_evidence: list[dict],
+        retry_context: str | None = None,
+    ) -> dict:
+        self.calls.append(
+            {
+                "operation": "score_story_matches",
+                "opportunity_context": opportunity_context,
+                "role_pack": role_pack,
+                "competency_map": competency_map,
+                "stories": stories,
+                "approved_evidence": approved_evidence,
+                "retry_context": retry_context,
+            }
+        )
+        if not self.responses:
+            story_id = stories[0]["id"] if stories else None
+            evidence_ids = stories[0].get("evidence_ids", []) if stories else []
+            return {
+                "matches": [
+                    {
+                        "competency_key": item["key"],
+                        "primary_story_id": story_id,
+                        "alternative_story_id": None,
+                        "competency_score": 75,
+                        "role_relevance_score": 75,
+                        "seniority_score": 70,
+                        "evidence_strength_score": 70,
+                        "company_context_score": 60,
+                        "explanation": "This story credibly supports the competency.",
+                        "jd_excerpt": None,
+                        "evidence_ids": evidence_ids,
+                        "missing_signal": None,
+                        "recommended_emphasis": "Emphasize the evidence-backed outcome.",
+                    }
+                    for item in competency_map
                 ]
             }
         response = self.responses.pop(0)
@@ -622,4 +684,50 @@ class OpenAIStoryClient:
             raise AIClientError("Story scoring failed.") from exc
         if not isinstance(parsed, dict):
             raise AIClientError("Story scoring returned invalid JSON.")
+        return parsed
+
+    def score_story_matches(
+        self,
+        *,
+        opportunity_context: dict,
+        role_pack: dict,
+        competency_map: list[dict],
+        stories: list[dict],
+        approved_evidence: list[dict],
+        retry_context: str | None = None,
+    ) -> dict:
+        from ai.prompts.matching import SYSTEM_PROMPT
+
+        prompt = SYSTEM_PROMPT
+        if retry_context:
+            prompt += f" Previous output was structurally invalid: {retry_context}."
+        user_payload = {
+            "opportunity_context": opportunity_context,
+            "role_pack": role_pack,
+            "competency_map": competency_map,
+            "stories": stories,
+            "approved_evidence": approved_evidence,
+        }
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "story_matches",
+                        "schema": StoryMatchSet.model_json_schema(),
+                        "strict": True,
+                    },
+                },
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": json.dumps(user_payload)},
+                ],
+            )
+            content = response.choices[0].message.content or "{}"
+            parsed = json.loads(content)
+        except Exception as exc:  # noqa: BLE001
+            raise AIClientError("Story match scoring failed.") from exc
+        if not isinstance(parsed, dict):
+            raise AIClientError("Story match scoring returned invalid JSON.")
         return parsed

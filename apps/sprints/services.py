@@ -290,3 +290,38 @@ class SprintWorkflowService:
             locked_sprint.state = SprintState.STORIES_READY
             locked_sprint.save(update_fields=["state", "updated_at"])
             return locked_sprint
+
+    @staticmethod
+    def mark_matching_ready(
+        *, user, sprint: InterviewSprint, has_matches_or_gaps: bool
+    ) -> InterviewSprint:
+        if not user.is_authenticated or sprint.user_id != user.id:
+            raise SprintOwnershipError("Sprint is not owned by this user.")
+        if not has_matches_or_gaps:
+            raise SprintTransitionConditionMissing("Story matches or explicit gaps are required.")
+
+        with transaction.atomic():
+            locked_sprint = InterviewSprint.objects.select_for_update().get(pk=sprint.pk, user=user)
+            current_state = SprintState(locked_sprint.state)
+            if current_state == SprintState.MATCHING_READY:
+                return locked_sprint
+            if current_state != SprintState.STORIES_READY:
+                raise InvalidSprintTransition(
+                    f"Cannot mark matching ready while Sprint is in {current_state}."
+                )
+            locked_sprint.state = SprintState.MATCHING_READY
+            locked_sprint.save(update_fields=["state", "updated_at"])
+            return locked_sprint
+
+    @staticmethod
+    def mark_matching_stale(*, user, sprint: InterviewSprint) -> InterviewSprint:
+        if not user.is_authenticated or sprint.user_id != user.id:
+            raise SprintOwnershipError("Sprint is not owned by this user.")
+
+        with transaction.atomic():
+            locked_sprint = InterviewSprint.objects.select_for_update().get(pk=sprint.pk, user=user)
+            current_state = SprintState(locked_sprint.state)
+            if current_state == SprintState.MATCHING_READY:
+                locked_sprint.state = SprintState.STORIES_READY
+                locked_sprint.save(update_fields=["state", "updated_at"])
+            return locked_sprint
