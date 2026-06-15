@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Reusable stories · Evidra{% endblock %}
+{% block content %}
+  <section class="card">
+    <p class="eyebrow">Reusable stories</p>
+    <h1>Your story bank</h1>
+    <p>Generate and refine reusable interview stories grounded only in approved evidence.</p>
+    {% if sprint.state == "EVIDENCE_APPROVED" or not stories %}
+      <form method="post" action="{% url 'stories:story_generate' %}">
+        {% csrf_token %}
+        <button type="submit">Generate reusable stories</button>
+      </form>
+    {% endif %}
+  </section>
+
+  {% for story in stories %}
+    <article class="card">
+      <p class="eyebrow">{{ story.status }}{% if story.source_story_id %} · revision {{ story.revision_number }}{% endif %}</p>
+      <h2>{{ story.title }}</h2>
+      {% if story.story_type %}<p><strong>Type:</strong> {{ story.story_type }}</p>{% endif %}
+      <dl class="summary-list">
+        <dt>Situation</dt><dd>{{ story.situation|default:"—" }}</dd>
+        <dt>Task</dt><dd>{{ story.task|default:"—" }}</dd>
+        <dt>Action</dt><dd>{{ story.action|default:"—" }}</dd>
+        <dt>Result</dt><dd>{{ story.result|default:"—" }}</dd>
+        <dt>Learning</dt><dd>{{ story.learning|default:"—" }}</dd>
+      </dl>
+      <h3>Short answer</h3>
+      <p>{{ story.short_answer }}</p>
+      <h3>90-second answer</h3>
+      <p>{{ story.ninety_second_answer }}</p>
+      <h3>Detailed answer</h3>
+      <p>{{ story.detailed_answer }}</p>
+      <p><strong>Competency tags:</strong> {{ story.competency_tags|join:", "|default:"—" }}</p>
+      <p><strong>Seniority signals:</strong> {{ story.seniority_signals|join:", "|default:"—" }}</p>
+      <p><strong>Evidence references:</strong></p>
+      <ul>
+        {% for evidence in story.evidence_references %}
+          <li>{{ evidence.title }}{% if evidence.source_location %} — {{ evidence.source_location }}{% endif %}</li>
+        {% empty %}
+          <li>{{ story.evidence_ids|join:", " }}</li>
+        {% endfor %}
+      </ul>
+      <p>
+        <strong>Quality:</strong> {{ story.quality_score|default:"—" }}
+        (specificity {{ story.specificity_score|default:"—" }}, impact {{ story.impact_score|default:"—" }},
+        ownership {{ story.ownership_score|default:"—" }}, clarity {{ story.clarity_score|default:"—" }})
+      </p>
+      {% if story.missing_details %}
+        <p><strong>Missing details:</strong> {{ story.missing_details|join:", " }}</p>
+      {% endif %}
+      <p><a class="button-link" href="{% url 'stories:story_edit' story.id %}">Edit story</a></p>
+      <form method="post" action="{% url 'stories:story_regenerate' story.id %}">
+        {% csrf_token %}
+        <button type="submit">Create draft revision</button>
+      </form>
+    </article>
+  {% empty %}
+    <section class="card">
+      <p>No reusable stories yet.</p>
+    </section>
+  {% endfor %}
+{% endblock %}

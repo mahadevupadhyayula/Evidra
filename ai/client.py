@@ -11,6 +11,7 @@ from ai.schemas.company_context import CompanyContext
 from ai.schemas.evidence import ExtractedEvidenceSet
 from ai.schemas.jd import JDAnalysis
 from ai.schemas.profile import ExtractedProfile
+from ai.schemas.stories import GeneratedStorySet, StoryScoreSet
 
 
 class AIClientError(RuntimeError):
@@ -45,6 +46,28 @@ class EvidenceExtractionClient(Protocol):
         retry_context: str | None = None,
     ) -> dict:
         """Return raw evidence data for schema validation."""
+
+
+class StoryGenerationClient(Protocol):
+    def generate_stories(
+        self,
+        *,
+        approved_evidence: list[dict],
+        profile_context: dict,
+        retry_context: str | None = None,
+    ) -> dict:
+        """Return raw reusable story data for schema validation."""
+
+
+class StoryScoringClient(Protocol):
+    def score_stories(
+        self,
+        *,
+        stories: list[dict],
+        approved_evidence: list[dict],
+        retry_context: str | None = None,
+    ) -> dict:
+        """Return raw story score data for schema validation."""
 
 
 class JDAnalysisClient(Protocol):
@@ -172,6 +195,91 @@ class MockAIClient:
                         "duplicate_key": None,
                         "duplicate_reason": None,
                     }
+                ]
+            }
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    def generate_stories(
+        self,
+        *,
+        approved_evidence: list[dict],
+        profile_context: dict,
+        retry_context: str | None = None,
+    ) -> dict:
+        self.calls.append(
+            {
+                "operation": "generate_stories",
+                "approved_evidence": approved_evidence,
+                "profile_context": profile_context,
+                "retry_context": retry_context,
+            }
+        )
+        if not self.responses:
+            evidence = approved_evidence[0]
+            evidence_id = int(evidence["id"])
+            action = evidence.get("action") or evidence.get("source_excerpt") or "I led the work."
+            result = (
+                evidence.get("result")
+                or evidence.get("metric")
+                or "The work improved outcomes."
+            )
+            return {
+                "stories": [
+                    {
+                        "client_story_id": "story-1",
+                        "title": evidence.get("title") or "Reusable story",
+                        "story_type": "GENERAL",
+                        "situation": evidence.get("problem"),
+                        "task": evidence.get("role"),
+                        "action": action,
+                        "result": result,
+                        "learning": None,
+                        "short_answer": f"{action} {result}",
+                        "ninety_second_answer": f"{action} {result}",
+                        "detailed_answer": f"{action} {result}",
+                        "competency_tags": evidence.get("competencies") or [],
+                        "seniority_signals": [],
+                        "evidence_ids": [evidence_id],
+                        "missing_details": [],
+                    }
+                ]
+            }
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    def score_stories(
+        self,
+        *,
+        stories: list[dict],
+        approved_evidence: list[dict],
+        retry_context: str | None = None,
+    ) -> dict:
+        self.calls.append(
+            {
+                "operation": "score_stories",
+                "stories": stories,
+                "approved_evidence": approved_evidence,
+                "retry_context": retry_context,
+            }
+        )
+        if not self.responses:
+            return {
+                "scores": [
+                    {
+                        "client_story_id": story["client_story_id"],
+                        "specificity_score": 80,
+                        "impact_score": 80,
+                        "ownership_score": 80,
+                        "clarity_score": 80,
+                        "missing_details": [],
+                        "scoring_notes": None,
+                    }
+                    for story in stories
                 ]
             }
         response = self.responses.pop(0)
@@ -425,4 +533,93 @@ class OpenAICompanyContextClient:
             raise AIClientError("Company context extraction failed.") from exc
         if not isinstance(parsed, dict):
             raise AIClientError("Company context extraction returned invalid JSON.")
+        return parsed
+
+
+class OpenAIStoryClient:
+    def __init__(self, *, api_key: str | None = None, model: str | None = None) -> None:
+        self.api_key = api_key if api_key is not None else settings.OPENAI_API_KEY
+        self.model = model or settings.EVIDRA_OPENAI_MODEL
+        if not self.api_key:
+            raise AIClientError("OpenAI API key is not configured.")
+        self.client = OpenAI(api_key=self.api_key)
+
+    def generate_stories(
+        self,
+        *,
+        approved_evidence: list[dict],
+        profile_context: dict,
+        retry_context: str | None = None,
+    ) -> dict:
+        from ai.prompts.stories import GENERATE_STORIES_SYSTEM_PROMPT
+
+        prompt = GENERATE_STORIES_SYSTEM_PROMPT
+        if retry_context:
+            prompt += f" Previous output was structurally invalid: {retry_context}."
+        user_payload = {
+            "approved_evidence": approved_evidence,
+            "profile_context": profile_context,
+        }
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "generated_stories",
+                        "schema": GeneratedStorySet.model_json_schema(),
+                        "strict": True,
+                    },
+                },
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": json.dumps(user_payload)},
+                ],
+            )
+            content = response.choices[0].message.content or "{}"
+            parsed = json.loads(content)
+        except Exception as exc:  # noqa: BLE001
+            raise AIClientError("Story generation failed.") from exc
+        if not isinstance(parsed, dict):
+            raise AIClientError("Story generation returned invalid JSON.")
+        return parsed
+
+    def score_stories(
+        self,
+        *,
+        stories: list[dict],
+        approved_evidence: list[dict],
+        retry_context: str | None = None,
+    ) -> dict:
+        from ai.prompts.stories import SCORE_STORIES_SYSTEM_PROMPT
+
+        prompt = SCORE_STORIES_SYSTEM_PROMPT
+        if retry_context:
+            prompt += f" Previous output was structurally invalid: {retry_context}."
+        user_payload = {
+            "stories": stories,
+            "approved_evidence": approved_evidence,
+        }
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "story_scores",
+                        "schema": StoryScoreSet.model_json_schema(),
+                        "strict": True,
+                    },
+                },
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": json.dumps(user_payload)},
+                ],
+            )
+            content = response.choices[0].message.content or "{}"
+            parsed = json.loads(content)
+        except Exception as exc:  # noqa: BLE001
+            raise AIClientError("Story scoring failed.") from exc
+        if not isinstance(parsed, dict):
+            raise AIClientError("Story scoring returned invalid JSON.")
         return parsed

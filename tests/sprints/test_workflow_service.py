@@ -169,3 +169,38 @@ def test_generic_transition_still_fails_closed_for_opportunity_confirmed():
 
     sprint.refresh_from_db()
     assert sprint.state == SprintState.PROFILE_CONFIRMED
+
+
+@pytest.mark.django_db
+def test_mark_stories_ready_transitions_from_evidence_approved():
+    user = get_user_model().objects.create_user(username="stories-ready@example.com")
+    sprint = InterviewSprint.objects.create(user=user, state=SprintState.EVIDENCE_APPROVED)
+
+    SprintWorkflowService.mark_stories_ready(user=user, sprint=sprint, has_usable_stories=True)
+
+    sprint.refresh_from_db()
+    assert sprint.state == SprintState.STORIES_READY
+
+
+@pytest.mark.django_db
+def test_mark_stories_ready_requires_usable_stories():
+    user = get_user_model().objects.create_user(username="no-stories@example.com")
+    sprint = InterviewSprint.objects.create(user=user, state=SprintState.EVIDENCE_APPROVED)
+
+    with pytest.raises(SprintTransitionConditionMissing):
+        SprintWorkflowService.mark_stories_ready(user=user, sprint=sprint, has_usable_stories=False)
+
+    sprint.refresh_from_db()
+    assert sprint.state == SprintState.EVIDENCE_APPROVED
+
+
+@pytest.mark.django_db
+def test_mark_stories_ready_rejects_skip_from_evidence_review():
+    user = get_user_model().objects.create_user(username="skip-stories@example.com")
+    sprint = InterviewSprint.objects.create(user=user, state=SprintState.EVIDENCE_REVIEW)
+
+    with pytest.raises(InvalidSprintTransition):
+        SprintWorkflowService.mark_stories_ready(user=user, sprint=sprint, has_usable_stories=True)
+
+    sprint.refresh_from_db()
+    assert sprint.state == SprintState.EVIDENCE_REVIEW

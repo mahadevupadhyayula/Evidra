@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     "apps.profiles",
     "apps.opportunities",
     "apps.evidence",
+    "apps.stories",
     "apps.sprints",
     "apps.workspace",
 ]
