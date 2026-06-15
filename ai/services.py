@@ -17,11 +17,13 @@ from ai.client import (
     OpenAIStoryClient,
     ProfileExtractionClient,
     StoryGenerationClient,
+    StoryMatchScoringClient,
     StoryScoringClient,
 )
 from ai.schemas.company_context import CompanyContext
 from ai.schemas.evidence import ExtractedEvidenceSet
 from ai.schemas.jd import JDAnalysis
+from ai.schemas.matching import StoryMatchSet
 from ai.schemas.profile import ExtractedProfile
 from ai.schemas.stories import GeneratedStorySet, StoryScoreSet
 
@@ -48,6 +50,10 @@ class AIStoryGenerationError(RuntimeError):
 
 class AIStoryScoringError(RuntimeError):
     """Raised when story scoring cannot produce valid structured output."""
+
+
+class AIStoryMatchScoringError(RuntimeError):
+    """Raised when story matching cannot produce valid structured output."""
 
 
 NUMERIC_CLAIM_PATTERN = re.compile(r"\b\d+(?:[,.]\d+)?%?\b")
@@ -87,6 +93,37 @@ def _has_unsupported_numeric_claim(value: str, normalized_resume: str) -> bool:
     return False
 
 
+def _grounding_text_from_values(*values: object) -> str:
+    parts: list[str] = []
+
+    def collect(value: object) -> None:
+        if value is None:
+            return
+        if isinstance(value, dict):
+            for item in value.values():
+                collect(item)
+            return
+        if isinstance(value, list):
+            for item in value:
+                collect(item)
+            return
+        parts.append(str(value))
+
+    for value in values:
+        collect(value)
+    return " ".join(parts).casefold()
+
+
+def _validate_match_narrative_numeric_claims(matches: StoryMatchSet, grounding_text: str) -> None:
+    for match in matches.matches:
+        for value in [match.explanation, match.missing_signal, match.recommended_emphasis]:
+            if not value:
+                continue
+            for numeric_claim in NUMERIC_CLAIM_PATTERN.finditer(value):
+                if numeric_claim.group(0).casefold() not in grounding_text:
+                    raise ValueError("Story match narrative contains an unsupported numeric claim.")
+
+
 @dataclass(frozen=True)
 class EvidraAIService:
     client: (
@@ -96,6 +133,7 @@ class EvidraAIService:
         | EvidenceExtractionClient
         | StoryGenerationClient
         | StoryScoringClient
+        | StoryMatchScoringClient
         | None
     ) = None
 
@@ -262,6 +300,67 @@ class EvidraAIService:
                 retry_context = str(exc)
         raise AIStoryScoringError(
             "Story scoring returned invalid structured output."
+        ) from last_error
+
+    def score_story_matches(
+        self,
+        *,
+        opportunity_context: dict,
+        role_pack: dict,
+        competency_map: list[dict],
+        stories: list[dict],
+        approved_evidence: list[dict],
+    ) -> StoryMatchSet:
+        if not competency_map:
+            raise AIStoryMatchScoringError("Competency map is required for matching.")
+        if not stories:
+            raise AIStoryMatchScoringError("Stories are required for matching.")
+
+        client = self.client or OpenAIStoryClient()
+        if not hasattr(client, "score_story_matches"):
+            raise AIStoryMatchScoringError("Story match scoring client is not configured.")
+
+        competency_keys = {str(item["key"]) for item in competency_map}
+        story_ids = {int(item["id"]) for item in stories}
+        evidence_ids = {int(item["id"]) for item in approved_evidence}
+        jd_text = str(opportunity_context.get("job_description") or "")
+        normalized_jd = jd_text.casefold()
+        grounding_text = _grounding_text_from_values(
+            opportunity_context, role_pack, competency_map, stories, approved_evidence
+        )
+        last_error: Exception | None = None
+        retry_context: str | None = None
+        for _attempt in range(2):
+            try:
+                raw_matches = client.score_story_matches(
+                    opportunity_context=opportunity_context,
+                    role_pack=role_pack,
+                    competency_map=competency_map,
+                    stories=stories,
+                    approved_evidence=approved_evidence,
+                    retry_context=retry_context,
+                )
+                matches = StoryMatchSet.model_validate(raw_matches)
+                match_keys = {match.competency_key for match in matches.matches}
+                if not match_keys.issubset(competency_keys):
+                    raise ValueError("Story matches reference an unknown competency key.")
+                for match in matches.matches:
+                    for story_id in [match.primary_story_id, match.alternative_story_id]:
+                        if story_id is not None and int(story_id) not in story_ids:
+                            raise ValueError("Story matches reference an unknown story.")
+                    if not set(match.evidence_ids).issubset(evidence_ids):
+                        raise ValueError("Story matches reference unknown evidence.")
+                    if match.jd_excerpt and match.jd_excerpt.casefold() not in normalized_jd:
+                        raise ValueError(
+                            "Story match JD excerpt must come from the job description."
+                        )
+                _validate_match_narrative_numeric_claims(matches, grounding_text)
+                return matches
+            except (AIClientError, ValidationError, ValueError) as exc:
+                last_error = exc
+                retry_context = str(exc)
+        raise AIStoryMatchScoringError(
+            "Story matching returned invalid structured output."
         ) from last_error
 
     def analyze_jd(

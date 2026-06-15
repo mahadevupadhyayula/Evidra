@@ -71,6 +71,7 @@ INSTALLED_APPS = [
     "apps.opportunities",
     "apps.evidence",
     "apps.stories",
+    "apps.matching",
     "apps.sprints",
     "apps.workspace",
 ]

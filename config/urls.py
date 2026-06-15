@@ -14,6 +14,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("accounts/", include("apps.accounts.urls")),
     path("workspace/evidence/", include("apps.evidence.urls")),
+    path("workspace/matching/", include("apps.matching.urls")),
     path("workspace/opportunity/", include("apps.opportunities.urls")),
     path("workspace/profile/", include("apps.profiles.urls")),
     path("workspace/resume/", include("apps.documents.urls")),

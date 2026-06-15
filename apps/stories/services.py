@@ -45,9 +45,11 @@ class StoryService:
     @staticmethod
     def list_stories(*, user, sprint: InterviewSprint):
         StoryService._require_story_stage_ready(user=user, sprint=sprint)
-        stories = list(Story.objects.filter(user=user, profile=sprint.active_profile).exclude(
-            status=StoryStatus.ARCHIVED
-        ))
+        stories = list(
+            Story.objects.filter(user=user, profile=sprint.active_profile).exclude(
+                status=StoryStatus.ARCHIVED
+            )
+        )
         StoryService._attach_evidence_references(user=user, sprint=sprint, stories=stories)
         return stories
 
@@ -182,8 +184,7 @@ class StoryService:
     ) -> Story:
         story = StoryService.get_owned_story(user=user, sprint=sprint, story_id=story_id)
         evidence_by_id = {
-            card.id: card
-            for card in StoryService._approved_evidence(user=user, sprint=sprint)
+            card.id: card for card in StoryService._approved_evidence(user=user, sprint=sprint)
         }
         evidence_ids = cleaned_data.get("evidence_ids") or []
         StoryService._validate_evidence_ids(
@@ -212,6 +213,7 @@ class StoryService:
                 "updated_at",
             ]
         )
+        StoryService._invalidate_matching_outputs(user=user, sprint=sprint)
         return story
 
     @staticmethod
@@ -220,8 +222,7 @@ class StoryService:
     ) -> Story:
         source = StoryService.get_owned_story(user=user, sprint=sprint, story_id=story_id)
         evidence_by_id = {
-            card.id: card
-            for card in StoryService._approved_evidence(user=user, sprint=sprint)
+            card.id: card for card in StoryService._approved_evidence(user=user, sprint=sprint)
         }
         StoryService._validate_evidence_ids(
             evidence_ids=source.evidence_ids, evidence_by_id=evidence_by_id
@@ -307,6 +308,16 @@ class StoryService:
             )
 
     @staticmethod
+    def _invalidate_matching_outputs(*, user, sprint: InterviewSprint) -> None:
+        if sprint.state != SprintState.MATCHING_READY:
+            return
+        from apps.matching.models import StoryMatch
+
+        with transaction.atomic():
+            StoryMatch.objects.select_for_update().filter(sprint=sprint, sprint__user=user).delete()
+            SprintWorkflowService.mark_matching_stale(user=user, sprint=sprint)
+
+    @staticmethod
     def calculate_quality_score(
         *, specificity_score: int, impact_score: int, ownership_score: int, clarity_score: int
     ) -> int:
@@ -334,7 +345,11 @@ class StoryService:
     def _require_story_stage_ready(*, user, sprint: InterviewSprint) -> None:
         if not user.is_authenticated or sprint.user_id != user.id:
             raise SprintOwnershipError("Sprint is not owned by this user.")
-        if sprint.state not in {SprintState.EVIDENCE_APPROVED, SprintState.STORIES_READY}:
+        if sprint.state not in {
+            SprintState.EVIDENCE_APPROVED,
+            SprintState.STORIES_READY,
+            SprintState.MATCHING_READY,
+        }:
             raise InvalidSprintTransition("Reusable stories require approved evidence.")
         if sprint.active_profile_id is None or sprint.active_resume_id is None:
             raise SprintTransitionConditionMissing("A confirmed profile and resume are required.")

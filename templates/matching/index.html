@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Contextual matching · Evidra{% endblock %}
+{% block content %}
+  <section class="card">
+    <p class="eyebrow">Contextual matching</p>
+    <h1>Match your stories to this opportunity</h1>
+    <p>Rank reusable stories against the confirmed role context with evidence-backed gaps and emphasis notes.</p>
+    {% if sprint.state == "STORIES_READY" or not matches %}
+      <form method="post" action="{% url 'matching:generate' %}">
+        {% csrf_token %}
+        <button type="submit">Generate contextual matches</button>
+      </form>
+    {% else %}
+      <form method="post" action="{% url 'matching:generate' %}">
+        {% csrf_token %}
+        <input type="hidden" name="force" value="1">
+        <button type="submit">Regenerate contextual matches</button>
+      </form>
+    {% endif %}
+  </section>
+
+  {% for match in matches %}
+    <article class="card">
+      <p class="eyebrow">{{ match.competency_key }}{% if match.user_selected %} · user override{% endif %}</p>
+      <h2>{{ match.competency_label|default:match.competency_key }}</h2>
+      {% if match.primary_story %}
+        <p><strong>Fit:</strong>
+          {% if match.total_score >= 80 %}Strong fit{% elif match.total_score >= 60 %}Good fit{% elif match.total_score >= 50 %}Partial fit{% else %}Gap{% endif %}
+          · {{ match.total_score }}/100
+        </p>
+        <p><strong>Primary story:</strong> {{ match.primary_story.title }}</p>
+        {% if match.alternative_story %}<p><strong>Alternative story:</strong> {{ match.alternative_story.title }}</p>{% endif %}
+        {% if match.selected_story %}<p><strong>User-selected story:</strong> {{ match.selected_story.title }}</p>{% endif %}
+        <p><strong>Component scores:</strong> competency {{ match.competency_score }}, role relevance {{ match.role_relevance_score }}, seniority {{ match.seniority_score }}, evidence {{ match.evidence_strength_score }}, company context {{ match.company_context_score }}</p>
+        {% if match.explanation %}<p><strong>Why it fits:</strong> {{ match.explanation }}</p>{% endif %}
+      {% else %}
+        <p><strong>Fit:</strong> Gap</p>
+        <p><strong>Missing signal:</strong> {{ match.missing_signal }}</p>
+      {% endif %}
+      {% if match.jd_excerpt %}<blockquote>{{ match.jd_excerpt }}</blockquote>{% endif %}
+      <p><strong>Evidence IDs:</strong> {{ match.evidence_ids|join:", "|default:"—" }}</p>
+      {% if match.recommended_emphasis %}<p><strong>Recommended emphasis:</strong> {{ match.recommended_emphasis }}</p>{% endif %}
+      {% if match.primary_story and match.alternative_story %}
+        <form method="post" action="{% url 'matching:override' match.id %}">
+          {% csrf_token %}
+          <label for="selected_story_id_{{ match.id }}">Choose story override</label>
+          <select id="selected_story_id_{{ match.id }}" name="selected_story_id">
+            <option value="{{ match.primary_story.id }}"{% if match.selected_story_id == match.primary_story.id %} selected{% endif %}>{{ match.primary_story.title }}</option>
+            <option value="{{ match.alternative_story.id }}"{% if match.selected_story_id == match.alternative_story.id %} selected{% endif %}>{{ match.alternative_story.title }}</option>
+          </select>
+          <button type="submit">Save override</button>
+        </form>
+      {% endif %}
+    </article>
+  {% empty %}
+    <section class="card">
+      <p>No contextual matches yet.</p>
+    </section>
+  {% endfor %}
+{% endblock %}
