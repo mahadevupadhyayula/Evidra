@@ -1,27 +1,25 @@
-from unittest.mock import patch
-
 import pytest
 from django.urls import reverse
 
-from ai.schemas.preview import ReadinessPreviewOutput
+from apps.generations.models import GenerationRun, GenerationRunStatus
 from apps.previews.models import ReadinessPreview
 from apps.sprints.models import SprintState
-from tests.previews.helpers import make_matching_ready_sprint, preview_response
+from tests.previews.helpers import make_matching_ready_sprint
 
 
 @pytest.mark.django_db
-def test_preview_generate_view_creates_preview(client):
-    user, sprint, _profile, evidence, story, _alternative, match = make_matching_ready_sprint()
+def test_preview_generate_view_queues_preview_generation(client):
+    user, sprint, *_rest = make_matching_ready_sprint()
     client.force_login(user)
-    with patch("apps.previews.services.EvidraAIService.generate_preview") as generate:
-        generate.return_value = ReadinessPreviewOutput.model_validate(
-            preview_response(match, story, evidence)
-        )
-        response = client.post(reverse("previews:generate"))
+
+    response = client.post(reverse("previews:generate"))
+
     assert response.status_code == 302
     sprint.refresh_from_db()
-    assert sprint.state == SprintState.PREVIEW_READY
-    assert ReadinessPreview.objects.filter(sprint=sprint).exists()
+    assert sprint.state == SprintState.MATCHING_READY
+    assert GenerationRun.objects.filter(
+        sprint=sprint, status=GenerationRunStatus.PENDING
+    ).exists()
 
 
 @pytest.mark.django_db

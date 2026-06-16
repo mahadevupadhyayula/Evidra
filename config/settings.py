@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     "apps.matching",
     "apps.previews",
     "apps.payments",
+    "apps.generations",
     "apps.sprints",
     "apps.workspace",
 ]
