@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     "apps.previews",
     "apps.payments",
     "apps.prepkits",
+    "apps.practice",
     "apps.generations",
     "apps.sprints",
     "apps.workspace",

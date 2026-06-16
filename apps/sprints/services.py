@@ -454,11 +454,43 @@ class SprintWorkflowService:
             return locked_sprint
 
     @staticmethod
+    def mark_practice_active(*, user, sprint: InterviewSprint, attempt) -> InterviewSprint:
+        if (
+            not user.is_authenticated
+            or sprint.user_id != user.id
+            or attempt.sprint_id != sprint.id
+            or attempt.sprint.user_id != user.id
+        ):
+            raise SprintOwnershipError("Sprint or practice attempt is not owned by this user.")
+
+        with transaction.atomic():
+            locked_sprint = InterviewSprint.objects.select_for_update().get(pk=sprint.pk, user=user)
+            from apps.practice.models import PracticeAttempt
+
+            if (
+                not attempt.pk
+                or not PracticeAttempt.objects.filter(
+                    pk=attempt.pk, sprint=locked_sprint, sprint__user=user
+                ).exists()
+            ):
+                raise SprintTransitionConditionMissing(
+                    "A persisted practice attempt is required before practice can become active."
+                )
+            current_state = SprintState(locked_sprint.state)
+            if current_state == SprintState.PRACTICE_ACTIVE:
+                return locked_sprint
+            if current_state != SprintState.PREPKIT_READY:
+                raise InvalidSprintTransition(
+                    f"Cannot mark practice active while Sprint is in {current_state}."
+                )
+            locked_sprint.state = SprintState.PRACTICE_ACTIVE
+            locked_sprint.save(update_fields=["state", "updated_at"])
+            return locked_sprint
+
+    @staticmethod
     def _validate_expected_payment_terms(*, payment) -> None:
         expected_amount = int(getattr(settings, "INTERVIEW_SPRINT_PRICE_AMOUNT", 0) or 0)
-        expected_currency = (
-            getattr(settings, "INTERVIEW_SPRINT_PRICE_CURRENCY", "") or ""
-        ).upper()
+        expected_currency = (getattr(settings, "INTERVIEW_SPRINT_PRICE_CURRENCY", "") or "").upper()
         if expected_amount <= 0 or len(expected_currency) != 3:
             raise SprintTransitionConditionMissing(
                 "Expected payment amount and currency are required."

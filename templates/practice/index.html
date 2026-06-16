@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card">
+  <h1>Text practice</h1>
+  <p>Choose a Prep Kit priority question, type an answer, and get grounded feedback.</p>
+  {% if access_error %}
+    <p class="error">{{ access_error }}</p>
+    <p><a href="{% url 'prepkits:detail' %}">Return to Prep Kit</a></p>
+  {% else %}
+    <form method="post" action="{% url 'practice:submit' %}">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <p>{{ form.question_id.label_tag }} {{ form.question_id }} {{ form.question_id.errors }}</p>
+      <p>{{ form.answer_text.label_tag }}<br>{{ form.answer_text }} {{ form.answer_text.errors }}</p>
+      <button type="submit">Evaluate answer</button>
+    </form>
+  {% endif %}
+</section>
+
+{% if questions %}
+<section class="card">
+  <h2>Priority questions</h2>
+  <ol>
+    {% for question in questions %}
+      <li><strong>{{ question.priority|title }}</strong>: {{ question.question }}{% if question.detail %}<br>{{ question.detail }}{% endif %}</li>
+    {% endfor %}
+  </ol>
+</section>
+{% endif %}
+
+{% include "practice/_attempt_history.html" %}
+{% endblock %}
