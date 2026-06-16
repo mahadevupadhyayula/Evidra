@@ -1,0 +1,35 @@
+<section class="card" id="preview-generation-status"
+  {% if generation_run and generation_run.status == "PENDING" or generation_run and generation_run.status == "RUNNING" %}
+    hx-get="{% url 'previews:generation_status_poll' %}"
+    hx-trigger="load, every 5s"
+    hx-swap="outerHTML"
+  {% endif %}>
+  <p class="eyebrow">Generation status</p>
+  {% if generation_run %}
+    <h2>{{ generation_run.get_status_display }}</h2>
+    {% if generation_run.status == "PENDING" %}
+      <p>Your readiness preview is queued. Run <code>python manage.py process_generation_runs</code> to process pending jobs.</p>
+    {% elif generation_run.status == "RUNNING" %}
+      <p>Your readiness preview is being generated from your approved evidence, stories and matching results.</p>
+    {% elif generation_run.status == "SUCCEEDED" %}
+      <p>Your readiness preview is ready.</p>
+    {% elif generation_run.status == "FAILED" %}
+      <p>{{ generation_run.error_message|default:"Generation failed. Please try again." }}</p>
+      <form method="post" action="{% url 'previews:generate' %}">
+        {% csrf_token %}
+        <input type="hidden" name="force" value="1">
+        <button type="submit">Retry preview generation</button>
+      </form>
+    {% elif generation_run.status == "STALE" %}
+      <p>Your inputs changed before this generation finished. Start generation again to use the latest inputs.</p>
+      <form method="post" action="{% url 'previews:generate' %}">
+        {% csrf_token %}
+        <input type="hidden" name="force" value="1">
+        <button type="submit">Generate latest preview</button>
+      </form>
+    {% endif %}
+  {% else %}
+    <h2>No generation run yet</h2>
+    <p>Start preview generation when your contextual matches are ready.</p>
+  {% endif %}
+</section>

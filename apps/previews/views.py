@@ -3,8 +3,8 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
-from ai.services import AIPreviewGenerationError
-from apps.previews.services import ReadinessPreviewError, ReadinessPreviewService
+from apps.generations.services import GenerationRunError, GenerationRunService
+from apps.previews.services import ReadinessPreviewService
 from apps.sprints.models import SprintState
 from apps.sprints.services import (
     InvalidSprintTransition,
@@ -36,10 +36,15 @@ def preview_detail(request):
         return redirect(redirect_target)
     try:
         preview = ReadinessPreviewService.current_preview(user=request.user, sprint=sprint)
+        generation_run = GenerationRunService.current_preview_run(user=request.user, sprint=sprint)
     except (InvalidSprintTransition, SprintTransitionConditionMissing) as exc:
         messages.error(request, str(exc))
         return redirect("workspace:index")
-    return render(request, "previews/detail.html", {"sprint": sprint, "preview": preview})
+    return render(
+        request,
+        "previews/detail.html",
+        {"sprint": sprint, "preview": preview, "generation_run": generation_run},
+    )
 
 
 @login_required
@@ -48,14 +53,29 @@ def preview_generate(request):
     sprint = SprintWorkflowService.get_or_create_current_sprint(request.user)
     force = request.POST.get("force") == "1"
     try:
-        ReadinessPreviewService.generate_preview(user=request.user, sprint=sprint, force=force)
-    except (
-        AIPreviewGenerationError,
-        ReadinessPreviewError,
-        InvalidSprintTransition,
-        SprintTransitionConditionMissing,
-    ) as exc:
+        run = GenerationRunService.enqueue_preview(user=request.user, sprint=sprint, force=force)
+    except (GenerationRunError, InvalidSprintTransition, SprintTransitionConditionMissing) as exc:
         messages.error(request, str(exc))
     else:
-        messages.success(request, "Generated your free readiness preview.")
+        if run.status == "SUCCEEDED":
+            messages.success(request, "Your free readiness preview is already up to date.")
+        else:
+            messages.success(request, "Queued your free readiness preview generation.")
     return redirect("previews:detail")
+
+
+@login_required
+def preview_generation_status_poll(request):
+    sprint = SprintWorkflowService.get_or_create_current_sprint(request.user)
+    preview = None
+    generation_run = None
+    try:
+        preview = ReadinessPreviewService.current_preview(user=request.user, sprint=sprint)
+        generation_run = GenerationRunService.current_preview_run(user=request.user, sprint=sprint)
+    except (InvalidSprintTransition, SprintTransitionConditionMissing):
+        pass
+    return render(
+        request,
+        "previews/_generation_status.html",
+        {"sprint": sprint, "preview": preview, "generation_run": generation_run},
+    )
