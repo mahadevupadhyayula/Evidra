@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Readiness preview · Evidra{% endblock %}
+{% block content %}
+  <section class="card">
+    <p class="eyebrow">Free readiness preview</p>
+    <h1>Your role-specific readiness snapshot</h1>
+    <p>This preview is useful but intentionally incomplete. Your profile, approved evidence, reusable stories and contextual matches remain available.</p>
+    <p>
+      <a href="{% url 'profiles:profile_review' %}">Profile</a> ·
+      <a href="{% url 'evidence:evidence_review' %}">Evidence</a> ·
+      <a href="{% url 'stories:story_bank' %}">Stories</a> ·
+      <a href="{% url 'matching:index' %}">Matching</a>
+    </p>
+    {% if preview %}
+      <form method="post" action="{% url 'previews:generate' %}">
+        {% csrf_token %}
+        <input type="hidden" name="force" value="1">
+        <button type="submit">Regenerate preview</button>
+      </form>
+    {% elif sprint.state == "MATCHING_READY" %}
+      <form method="post" action="{% url 'previews:generate' %}">
+        {% csrf_token %}
+        <button type="submit">Generate readiness preview</button>
+      </form>
+    {% endif %}
+  </section>
+
+  {% if preview %}
+    <section class="card">
+      <p class="eyebrow">Role summary</p>
+      <p>{{ preview.role_summary }}</p>
+    </section>
+
+    <section class="card">
+      <h2>Top competencies</h2>
+      <ul>
+        {% for competency in preview.competencies %}
+          <li><strong>{{ competency.label }}</strong> — {{ competency.readiness }}</li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Strengths</h2>
+      <ul>
+        {% for strength in preview.strengths %}
+          <li><strong>{{ strength.title }}</strong>: {{ strength.explanation }}</li>
+        {% empty %}
+          <li>No strength has enough support yet.</li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Gaps</h2>
+      <ul>
+        {% for gap in preview.gaps %}
+          <li><strong>{{ gap.title }}</strong>: {{ gap.explanation }}{% if gap.recommended_next_step %} {{ gap.recommended_next_step }}{% endif %}</li>
+        {% empty %}
+          <li>No explicit gap was identified for this preview.</li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Evidence completeness</h2>
+      <p>{{ preview.evidence_completeness.summary }}</p>
+      <p><strong>Approved evidence:</strong> {{ preview.evidence_completeness.approved_evidence_count }}</p>
+      <p><strong>Result-backed evidence:</strong> {{ preview.evidence_completeness.result_backed_evidence_count }}</p>
+      <p><strong>Competencies with evidence:</strong> {{ preview.evidence_completeness.competencies_with_evidence_count }}</p>
+    </section>
+
+    <section class="card">
+      <h2>Story coverage</h2>
+      <p>{{ preview.story_coverage.summary }}</p>
+      <p><strong>Ready stories:</strong> {{ preview.story_coverage.ready_story_count }}</p>
+      <p><strong>Matched competencies:</strong> {{ preview.story_coverage.matched_competency_count }}</p>
+      <p><strong>Gap competencies:</strong> {{ preview.story_coverage.gap_competency_count }}</p>
+    </section>
+
+    <section class="card">
+      <h2>Matched-story excerpt</h2>
+      <p><strong>{{ preview.matched_story_excerpt.title }}</strong></p>
+      <blockquote>{{ preview.matched_story_excerpt.excerpt }}</blockquote>
+      <p><strong>Evidence IDs:</strong> {{ preview.matched_story_excerpt.evidence_ids|join:", " }}</p>
+    </section>
+
+    <section class="card">
+      <h2>Paid Prep Kit</h2>
+      <p>{{ preview.prepkit_explanation }}</p>
+      <button type="button" disabled>Checkout coming soon</button>
+      <p class="helptext">Payment is not available in this stage. No order has been created.</p>
+    </section>
+  {% else %}
+    <section class="card">
+      <p>No readiness preview has been generated yet.</p>
+    </section>
+  {% endif %}
+{% endblock %}

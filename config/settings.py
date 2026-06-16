@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     "apps.evidence",
     "apps.stories",
     "apps.matching",
+    "apps.previews",
     "apps.sprints",
     "apps.workspace",
 ]

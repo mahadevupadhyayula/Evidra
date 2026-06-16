@@ -21,7 +21,14 @@ def profile_review(request):
         messages.error(request, "Confirm your resume before creating your profile.")
         return redirect("documents:resume_upload")
     try:
-        profile = CareerProfileService.get_or_create_draft_profile(user=request.user, sprint=sprint)
+        if sprint.state == SprintState.RESUME_READY:
+            profile = CareerProfileService.get_or_create_draft_profile(
+                user=request.user, sprint=sprint
+            )
+        else:
+            profile = CareerProfileService.get_current_profile(request.user, sprint)
+            if profile is None:
+                raise SprintTransitionConditionMissing("A confirmed active profile is required.")
     except (
         AIProfileExtractionError,
         CareerProfileError,

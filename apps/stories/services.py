@@ -44,7 +44,7 @@ STORY_EDITABLE_FIELDS = [
 class StoryService:
     @staticmethod
     def list_stories(*, user, sprint: InterviewSprint):
-        StoryService._require_story_stage_ready(user=user, sprint=sprint)
+        StoryService._require_story_stage_readable(user=user, sprint=sprint)
         stories = list(
             Story.objects.filter(user=user, profile=sprint.active_profile).exclude(
                 status=StoryStatus.ARCHIVED
@@ -340,6 +340,27 @@ class StoryService:
             operation=operation,
             error_message=error_message[:2000],
         )
+
+    @staticmethod
+    def _require_story_stage_readable(*, user, sprint: InterviewSprint) -> None:
+        if not user.is_authenticated or sprint.user_id != user.id:
+            raise SprintOwnershipError("Sprint is not owned by this user.")
+        if sprint.state not in {
+            SprintState.EVIDENCE_APPROVED,
+            SprintState.STORIES_READY,
+            SprintState.MATCHING_READY,
+            SprintState.PREVIEW_READY,
+        }:
+            raise InvalidSprintTransition("Reusable stories require approved evidence.")
+        if sprint.active_profile_id is None or sprint.active_resume_id is None:
+            raise SprintTransitionConditionMissing("A confirmed profile and resume are required.")
+        if (
+            sprint.active_profile.user_id != user.id
+            or sprint.active_profile.confirmation_status != "CONFIRMED"
+        ):
+            raise SprintTransitionConditionMissing("A confirmed active profile is required.")
+        if sprint.active_resume.user_id != user.id or not sprint.active_resume.is_active:
+            raise SprintTransitionConditionMissing("A confirmed active resume is required.")
 
     @staticmethod
     def _require_story_stage_ready(*, user, sprint: InterviewSprint) -> None:
