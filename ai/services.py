@@ -15,6 +15,7 @@ from ai.client import (
     OpenAIJDClient,
     OpenAIProfileClient,
     OpenAIStoryClient,
+    PreviewGenerationClient,
     ProfileExtractionClient,
     StoryGenerationClient,
     StoryMatchScoringClient,
@@ -24,6 +25,7 @@ from ai.schemas.company_context import CompanyContext
 from ai.schemas.evidence import ExtractedEvidenceSet
 from ai.schemas.jd import JDAnalysis
 from ai.schemas.matching import StoryMatchSet
+from ai.schemas.preview import ReadinessPreviewOutput
 from ai.schemas.profile import ExtractedProfile
 from ai.schemas.stories import GeneratedStorySet, StoryScoreSet
 
@@ -54,6 +56,10 @@ class AIStoryScoringError(RuntimeError):
 
 class AIStoryMatchScoringError(RuntimeError):
     """Raised when story matching cannot produce valid structured output."""
+
+
+class AIPreviewGenerationError(RuntimeError):
+    """Raised when readiness preview generation cannot produce valid structured output."""
 
 
 NUMERIC_CLAIM_PATTERN = re.compile(r"\b\d+(?:[,.]\d+)?%?\b")
@@ -134,6 +140,7 @@ class EvidraAIService:
         | StoryGenerationClient
         | StoryScoringClient
         | StoryMatchScoringClient
+        | PreviewGenerationClient
         | None
     ) = None
 
@@ -361,6 +368,50 @@ class EvidraAIService:
                 retry_context = str(exc)
         raise AIStoryMatchScoringError(
             "Story matching returned invalid structured output."
+        ) from last_error
+
+    def generate_preview(
+        self,
+        *,
+        opportunity_context: dict,
+        role_pack: dict,
+        matches: list[dict],
+        stories: list[dict],
+        approved_evidence: list[dict],
+        matched_story_excerpt_source: dict,
+        deterministic_counts: dict,
+    ) -> ReadinessPreviewOutput:
+        if not matches:
+            raise AIPreviewGenerationError("Contextual matches are required for preview.")
+        if not stories:
+            raise AIPreviewGenerationError("Stories are required for preview.")
+        if not approved_evidence:
+            raise AIPreviewGenerationError("Approved evidence is required for preview.")
+
+        client = self.client or OpenAIStoryClient()
+        if not hasattr(client, "generate_preview"):
+            raise AIPreviewGenerationError("Readiness preview client is not configured.")
+
+        last_error: Exception | None = None
+        retry_context: str | None = None
+        for _attempt in range(2):
+            try:
+                raw_preview = client.generate_preview(
+                    opportunity_context=opportunity_context,
+                    role_pack=role_pack,
+                    matches=matches,
+                    stories=stories,
+                    approved_evidence=approved_evidence,
+                    matched_story_excerpt_source=matched_story_excerpt_source,
+                    deterministic_counts=deterministic_counts,
+                    retry_context=retry_context,
+                )
+                return ReadinessPreviewOutput.model_validate(raw_preview)
+            except (AIClientError, ValidationError, ValueError) as exc:
+                last_error = exc
+                retry_context = str(exc)
+        raise AIPreviewGenerationError(
+            "Readiness preview generation returned invalid structured output."
         ) from last_error
 
     def analyze_jd(

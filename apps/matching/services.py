@@ -75,9 +75,7 @@ def _validate_narrative_numeric_claims(*, values: list[str | None], grounding_te
 class MatchingService:
     @staticmethod
     def list_matches(*, user, sprint: InterviewSprint) -> list[StoryMatch]:
-        MatchingService._require_matching_stage_ready(
-            user=user, sprint=sprint, allow_stories_ready=True
-        )
+        MatchingService._require_matching_stage_readable(user=user, sprint=sprint)
         return list(
             StoryMatch.objects.select_related(
                 "primary_story", "alternative_story", "selected_story", "sprint"
@@ -380,6 +378,19 @@ class MatchingService:
             "recommended_emphasis": recommended_emphasis,
             "user_selected": False,
         }
+
+    @staticmethod
+    def _require_matching_stage_readable(*, user, sprint: InterviewSprint) -> None:
+        if not user.is_authenticated or sprint.user_id != user.id:
+            raise SprintOwnershipError("Sprint is not owned by this user.")
+        if SprintState(sprint.state) not in {
+            SprintState.STORIES_READY,
+            SprintState.MATCHING_READY,
+            SprintState.PREVIEW_READY,
+        }:
+            raise InvalidSprintTransition(f"Cannot use matching while Sprint is in {sprint.state}.")
+        if sprint.active_profile_id is None:
+            raise SprintTransitionConditionMissing("A confirmed active profile is required.")
 
     @staticmethod
     def _require_matching_stage_ready(

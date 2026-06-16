@@ -68,7 +68,7 @@ CARD_EDITABLE_FIELDS = [
 class EvidenceService:
     @staticmethod
     def list_highlights(*, user, sprint: InterviewSprint):
-        EvidenceService._require_evidence_stage_ready(user=user, sprint=sprint)
+        EvidenceService._require_evidence_stage_readable(user=user, sprint=sprint)
         return CareerHighlight.objects.filter(
             user=user,
             profile=sprint.active_profile,
@@ -76,7 +76,7 @@ class EvidenceService:
 
     @staticmethod
     def list_cards(*, user, sprint: InterviewSprint):
-        EvidenceService._require_evidence_stage_ready(user=user, sprint=sprint)
+        EvidenceService._require_evidence_stage_readable(user=user, sprint=sprint)
         return EvidenceCard.objects.select_related(
             "source_document", "source_highlight", "duplicate_of"
         ).filter(user=user, profile=sprint.active_profile)
@@ -357,7 +357,7 @@ class EvidenceService:
 
     @staticmethod
     def evaluate_threshold(*, user, sprint: InterviewSprint) -> EvidenceThresholdResult:
-        EvidenceService._require_evidence_stage_ready(user=user, sprint=sprint)
+        EvidenceService._require_evidence_stage_readable(user=user, sprint=sprint)
         cards = list(
             EvidenceCard.objects.select_related("source_document", "source_highlight").filter(
                 user=user,
@@ -373,6 +373,32 @@ class EvidenceService:
             ),
             metrics_valid=all(EvidenceService._metric_is_valid(card) for card in cards),
         )
+
+    @staticmethod
+    def _require_evidence_stage_readable(*, user, sprint: InterviewSprint) -> None:
+        if not user.is_authenticated or sprint.user_id != user.id:
+            raise SprintOwnershipError("Sprint is not owned by this user.")
+        if sprint.state not in {
+            SprintState.OPPORTUNITY_CONFIRMED,
+            SprintState.EVIDENCE_REVIEW,
+            SprintState.EVIDENCE_APPROVED,
+            SprintState.STORIES_READY,
+            SprintState.MATCHING_READY,
+            SprintState.PREVIEW_READY,
+        }:
+            raise InvalidSprintTransition("Evidence review requires a confirmed opportunity.")
+        if sprint.active_profile_id is None or sprint.active_resume_id is None:
+            raise SprintTransitionConditionMissing("A confirmed profile and resume are required.")
+        profile_is_confirmed = sprint.active_profile.confirmation_status == "CONFIRMED"
+        if sprint.active_profile.user_id != user.id or not profile_is_confirmed:
+            raise SprintTransitionConditionMissing("A confirmed active profile is required.")
+        if (
+            sprint.active_resume.user_id != user.id
+            or not sprint.active_resume.is_active
+            or sprint.active_resume.parsing_status != DocumentParsingStatus.CONFIRMED
+        ):
+            raise SprintTransitionConditionMissing("A confirmed active resume is required.")
+        EvidenceService._get_confirmed_opportunity(user=user, sprint=sprint)
 
     @staticmethod
     def _require_evidence_stage_ready(*, user, sprint: InterviewSprint) -> None:

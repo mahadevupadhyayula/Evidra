@@ -11,6 +11,7 @@ from ai.schemas.company_context import CompanyContext
 from ai.schemas.evidence import ExtractedEvidenceSet
 from ai.schemas.jd import JDAnalysis
 from ai.schemas.matching import StoryMatchSet
+from ai.schemas.preview import ReadinessPreviewOutput
 from ai.schemas.profile import ExtractedProfile
 from ai.schemas.stories import GeneratedStorySet, StoryScoreSet
 
@@ -83,6 +84,22 @@ class StoryMatchScoringClient(Protocol):
         retry_context: str | None = None,
     ) -> dict:
         """Return raw story-match component scores for schema validation."""
+
+
+class PreviewGenerationClient(Protocol):
+    def generate_preview(
+        self,
+        *,
+        opportunity_context: dict,
+        role_pack: dict,
+        matches: list[dict],
+        stories: list[dict],
+        approved_evidence: list[dict],
+        matched_story_excerpt_source: dict,
+        deterministic_counts: dict,
+        retry_context: str | None = None,
+    ) -> dict:
+        """Return raw readiness preview data for schema validation."""
 
 
 class JDAnalysisClient(Protocol):
@@ -343,6 +360,108 @@ class MockAIClient:
                     }
                     for item in competency_map
                 ]
+            }
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    def generate_preview(
+        self,
+        *,
+        opportunity_context: dict,
+        role_pack: dict,
+        matches: list[dict],
+        stories: list[dict],
+        approved_evidence: list[dict],
+        matched_story_excerpt_source: dict,
+        deterministic_counts: dict,
+        retry_context: str | None = None,
+    ) -> dict:
+        self.calls.append(
+            {
+                "operation": "generate_preview",
+                "opportunity_context": opportunity_context,
+                "role_pack": role_pack,
+                "matches": matches,
+                "stories": stories,
+                "approved_evidence": approved_evidence,
+                "matched_story_excerpt_source": matched_story_excerpt_source,
+                "deterministic_counts": deterministic_counts,
+                "retry_context": retry_context,
+            }
+        )
+        if not self.responses:
+            match = matches[0]
+            story = stories[0]
+            evidence_ids = story.get("evidence_ids", [])
+            return {
+                "role_summary": "This preview summarizes readiness for the confirmed role.",
+                "competencies": [
+                    {
+                        "key": f"{(matches[index % len(matches)])['competency_key']}_{index}",
+                        "label": (
+                            (matches[index % len(matches)]).get("competency_label")
+                            or (matches[index % len(matches)])["competency_key"]
+                        ),
+                        "readiness": "covered"
+                        if (matches[index % len(matches)]).get("primary_story_id")
+                        else "gap",
+                        "source_match_id": (matches[index % len(matches)])["id"],
+                        "evidence_ids": (matches[index % len(matches)]).get("evidence_ids") or [],
+                        "story_ids": [(matches[index % len(matches)])["primary_story_id"]]
+                        if (matches[index % len(matches)]).get("primary_story_id")
+                        else [],
+                    }
+                    for index in range(5)
+                ],
+                "strengths": [
+                    {
+                        "title": f"Evidence-backed story coverage {index + 1}",
+                        "explanation": "At least one reusable story maps to the role context.",
+                        "source_match_id": match["id"],
+                        "evidence_ids": match.get("evidence_ids") or evidence_ids,
+                        "story_ids": [story["id"]],
+                    }
+                    for index in range(3)
+                ],
+                "gaps": [
+                    {
+                        "title": f"Sharpen missing signals {index + 1}",
+                        "explanation": (
+                            "Use the Prep Kit to turn weaker signals into focused "
+                            "practice priorities."
+                        ),
+                        "recommended_next_step": (
+                            "Review the weakest competency before interview practice."
+                        ),
+                        "source_match_id": match["id"],
+                        "evidence_ids": [],
+                        "story_ids": [],
+                    }
+                    for index in range(3)
+                ],
+                "evidence_completeness": {
+                    "approved_evidence_count": deterministic_counts["approved_evidence_count"],
+                    "result_backed_evidence_count": deterministic_counts[
+                        "result_backed_evidence_count"
+                    ],
+                    "competencies_with_evidence_count": deterministic_counts[
+                        "competencies_with_evidence_count"
+                    ],
+                    "summary": "Approved evidence is available for preview generation.",
+                },
+                "story_coverage": {
+                    "ready_story_count": deterministic_counts["ready_story_count"],
+                    "matched_competency_count": deterministic_counts["matched_competency_count"],
+                    "gap_competency_count": deterministic_counts["gap_competency_count"],
+                    "summary": "Reusable stories cover part of the role context.",
+                },
+                "matched_story_excerpt": matched_story_excerpt_source,
+                "prepkit_explanation": (
+                    "The paid Prep Kit will expand this preview into focused questions, "
+                    "story guidance, and practice priorities after payment is implemented."
+                ),
             }
         response = self.responses.pop(0)
         if isinstance(response, Exception):
@@ -730,4 +849,54 @@ class OpenAIStoryClient:
             raise AIClientError("Story match scoring failed.") from exc
         if not isinstance(parsed, dict):
             raise AIClientError("Story match scoring returned invalid JSON.")
+        return parsed
+
+    def generate_preview(
+        self,
+        *,
+        opportunity_context: dict,
+        role_pack: dict,
+        matches: list[dict],
+        stories: list[dict],
+        approved_evidence: list[dict],
+        matched_story_excerpt_source: dict,
+        deterministic_counts: dict,
+        retry_context: str | None = None,
+    ) -> dict:
+        from ai.prompts.preview import SYSTEM_PROMPT
+
+        prompt = SYSTEM_PROMPT
+        if retry_context:
+            prompt += f" Previous output was structurally invalid: {retry_context}."
+        user_payload = {
+            "opportunity_context": opportunity_context,
+            "role_pack": role_pack,
+            "matches": matches,
+            "stories": stories,
+            "approved_evidence": approved_evidence,
+            "matched_story_excerpt_source": matched_story_excerpt_source,
+            "deterministic_counts": deterministic_counts,
+        }
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "readiness_preview",
+                        "schema": ReadinessPreviewOutput.model_json_schema(),
+                        "strict": True,
+                    },
+                },
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": json.dumps(user_payload)},
+                ],
+            )
+            content = response.choices[0].message.content or "{}"
+            parsed = json.loads(content)
+        except Exception as exc:  # noqa: BLE001
+            raise AIClientError("Readiness preview generation failed.") from exc
+        if not isinstance(parsed, dict):
+            raise AIClientError("Readiness preview generation returned invalid JSON.")
         return parsed
