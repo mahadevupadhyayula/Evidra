@@ -11,6 +11,7 @@ from ai.schemas.company_context import CompanyContext
 from ai.schemas.evidence import ExtractedEvidenceSet
 from ai.schemas.jd import JDAnalysis
 from ai.schemas.matching import StoryMatchSet
+from ai.schemas.practice import PracticeFeedbackOutput
 from ai.schemas.prepkit import PrepKitAnalysisOutput, PrepKitArtifactOutput
 from ai.schemas.preview import ReadinessPreviewOutput
 from ai.schemas.profile import ExtractedProfile
@@ -132,6 +133,20 @@ class PrepKitArtifactClient(Protocol):
         retry_context: str | None = None,
     ) -> dict:
         """Return raw Prep Kit artifact data for schema validation."""
+
+
+class AnswerEvaluationClient(Protocol):
+    def evaluate_answer(
+        self,
+        *,
+        question: dict,
+        answer_text: str,
+        linked_story: dict | None,
+        approved_evidence: list[dict],
+        prepkit_context: dict,
+        retry_context: str | None = None,
+    ) -> dict:
+        """Return raw practice-answer feedback for schema validation."""
 
 
 class JDAnalysisClient(Protocol):
@@ -649,6 +664,53 @@ class MockAIClient:
             raise response
         return response
 
+    def evaluate_answer(
+        self,
+        *,
+        question: dict,
+        answer_text: str,
+        linked_story: dict | None,
+        approved_evidence: list[dict],
+        prepkit_context: dict,
+        retry_context: str | None = None,
+    ) -> dict:
+        self.calls.append(
+            {
+                "operation": "evaluate_answer",
+                "question": question,
+                "answer_text": answer_text,
+                "linked_story": linked_story,
+                "approved_evidence": approved_evidence,
+                "prepkit_context": prepkit_context,
+                "retry_context": retry_context,
+            }
+        )
+        if not self.responses:
+            improved = linked_story.get("short_answer") if linked_story else answer_text
+            return {
+                "relevance_score": 4,
+                "structure_score": 4,
+                "specificity_score": 4,
+                "ownership_score": 4,
+                "impact_score": 4,
+                "clarity_score": 4,
+                "strengths": ["The answer addresses the selected question."],
+                "improvements": ["Add a clearer result from approved evidence."],
+                "improved_answer": improved or answer_text,
+                "follow_up_question": "What result would you emphasize next?",
+                "unsupported_claims": [],
+                "source_refs": [
+                    {
+                        "source_type": "question",
+                        "source_id": question.get("question_id"),
+                        "source_field": "question",
+                    }
+                ],
+            }
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
 
     def analyze_jd(
         self,
@@ -1127,6 +1189,52 @@ class OpenAIStoryClient:
             raise AIClientError("Story match scoring failed.") from exc
         if not isinstance(parsed, dict):
             raise AIClientError("Story match scoring returned invalid JSON.")
+        return parsed
+
+    def evaluate_answer(
+        self,
+        *,
+        question: dict,
+        answer_text: str,
+        linked_story: dict | None,
+        approved_evidence: list[dict],
+        prepkit_context: dict,
+        retry_context: str | None = None,
+    ) -> dict:
+        from ai.prompts.practice import SYSTEM_PROMPT
+
+        prompt = SYSTEM_PROMPT
+        if retry_context:
+            prompt += f" Previous output was structurally invalid: {retry_context}."
+        user_payload = {
+            "question": question,
+            "answer_text": answer_text,
+            "linked_story": linked_story,
+            "approved_evidence": approved_evidence,
+            "prepkit_context": prepkit_context,
+        }
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "practice_feedback",
+                        "schema": PracticeFeedbackOutput.model_json_schema(),
+                        "strict": True,
+                    },
+                },
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": json.dumps(user_payload)},
+                ],
+            )
+            content = response.choices[0].message.content or "{}"
+            parsed = json.loads(content)
+        except Exception as exc:  # noqa: BLE001
+            raise AIClientError("Practice answer evaluation failed.") from exc
+        if not isinstance(parsed, dict):
+            raise AIClientError("Practice answer evaluation returned invalid JSON.")
         return parsed
 
     def generate_preview(

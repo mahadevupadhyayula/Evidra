@@ -1,0 +1,34 @@
+<section class="card">
+  <h2>Attempt history</h2>
+  {% if attempts %}
+    <ol>
+      {% for attempt in attempts %}
+        <li>
+          <h3>{{ attempt.question_id }} — attempt #{{ attempt.attempt_number }}</h3>
+          <p><strong>Your answer:</strong> {{ attempt.answer_text }}</p>
+          <p><strong>Scores:</strong>
+            relevance {{ attempt.relevance_score }}, structure {{ attempt.structure_score }}, specificity {{ attempt.specificity_score }}, ownership {{ attempt.ownership_score }}, impact {{ attempt.impact_score }}, clarity {{ attempt.clarity_score }}
+          </p>
+          <p><strong>Strengths:</strong> {{ attempt.feedback.strengths|join:", " }}</p>
+          <p><strong>Improvements:</strong> {{ attempt.feedback.improvements|join:", " }}</p>
+          {% if attempt.feedback.comparison.previous_attempt_id %}
+            <p><strong>Comparison:</strong> overall delta {{ attempt.feedback.comparison.overall_delta }}; current average {{ attempt.feedback.comparison.current_average }}</p>
+            <ul>
+              {% for component, delta in attempt.feedback.comparison.component_deltas.items %}
+                <li>{{ component }}: {{ delta }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+          {% if attempt.feedback.unsupported_claims %}
+            <p><strong>Unsupported claims:</strong></p>
+            <ul>{% for claim in attempt.feedback.unsupported_claims %}<li>{{ claim.claim }} — {{ claim.reason }}</li>{% endfor %}</ul>
+          {% endif %}
+          <p><strong>Improved answer:</strong> {{ attempt.improved_answer }}</p>
+          <p><strong>Follow-up:</strong> {{ attempt.follow_up_question }}</p>
+        </li>
+      {% endfor %}
+    </ol>
+  {% else %}
+    <p>No practice attempts yet.</p>
+  {% endif %}
+</section>

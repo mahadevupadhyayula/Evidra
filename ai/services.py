@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from ai.client import (
     AIClientError,
+    AnswerEvaluationClient,
     CompanyContextExtractionClient,
     EvidenceExtractionClient,
     JDAnalysisClient,
@@ -27,6 +28,7 @@ from ai.schemas.company_context import CompanyContext
 from ai.schemas.evidence import ExtractedEvidenceSet
 from ai.schemas.jd import JDAnalysis
 from ai.schemas.matching import StoryMatchSet
+from ai.schemas.practice import PracticeFeedbackOutput
 from ai.schemas.prepkit import PrepKitAnalysisOutput, PrepKitArtifactOutput
 from ai.schemas.preview import ReadinessPreviewOutput
 from ai.schemas.profile import ExtractedProfile
@@ -71,6 +73,10 @@ class AIPrepKitAnalysisError(RuntimeError):
 
 class AIPrepKitArtifactError(RuntimeError):
     """Raised when Prep Kit artifact generation cannot produce valid structured output."""
+
+
+class AIAnswerEvaluationError(RuntimeError):
+    """Raised when practice answer evaluation cannot produce valid structured output."""
 
 
 NUMERIC_CLAIM_PATTERN = re.compile(r"\b\d+(?:[,.]\d+)?%?\b")
@@ -154,6 +160,7 @@ class EvidraAIService:
         | PreviewGenerationClient
         | PrepKitAnalysisClient
         | PrepKitArtifactClient
+        | AnswerEvaluationClient
         | None
     ) = None
 
@@ -501,6 +508,58 @@ class EvidraAIService:
             "Prep Kit artifact generation returned invalid structured output."
         ) from last_error
 
+    def evaluate_answer(
+        self,
+        *,
+        question: dict,
+        answer_text: str,
+        linked_story: dict | None,
+        approved_evidence: list[dict],
+        prepkit_context: dict,
+    ) -> PracticeFeedbackOutput:
+        answer = answer_text.strip()
+        if not question or not answer:
+            raise AIAnswerEvaluationError("A question and text answer are required.")
+        try:
+            client = self.client or OpenAIStoryClient()
+        except AIClientError as exc:
+            raise AIAnswerEvaluationError(
+                "Practice answer evaluation client is not configured."
+            ) from exc
+        if not hasattr(client, "evaluate_answer"):
+            raise AIAnswerEvaluationError("Practice answer evaluation client is not configured.")
+        grounding_text = _grounding_text_from_values(
+            question, linked_story, approved_evidence, prepkit_context
+        )
+        last_error: Exception | None = None
+        retry_context: str | None = None
+        for _attempt in range(2):
+            try:
+                raw_feedback = client.evaluate_answer(
+                    question=question,
+                    answer_text=answer,
+                    linked_story=linked_story,
+                    approved_evidence=approved_evidence,
+                    prepkit_context=prepkit_context,
+                    retry_context=retry_context,
+                )
+                feedback = PracticeFeedbackOutput.model_validate(raw_feedback)
+                _validate_practice_numeric_claims(feedback, grounding_text, answer)
+                _validate_practice_source_refs(
+                    feedback=feedback,
+                    question=question,
+                    linked_story=linked_story,
+                    approved_evidence=approved_evidence,
+                    prepkit_context=prepkit_context,
+                )
+                return feedback
+            except (AIClientError, ValidationError, ValueError) as exc:
+                last_error = exc
+                retry_context = str(exc)
+        raise AIAnswerEvaluationError(
+            "Practice answer evaluation returned invalid structured output."
+        ) from last_error
+
     def analyze_jd(
         self,
         *,
@@ -722,3 +781,64 @@ def _has_unsupported_story_numeric_claim(value: str, normalized_evidence_text: s
         if normalized_claim and normalized_claim not in normalized_evidence_text:
             return True
     return False
+
+
+def _validate_practice_numeric_claims(
+    feedback: PracticeFeedbackOutput, grounding_text: str, answer_text: str
+) -> None:
+    answer_grounding = f"{grounding_text} {answer_text.casefold()}"
+    values = [
+        feedback.improved_answer,
+        feedback.follow_up_question,
+        *feedback.strengths,
+        *feedback.improvements,
+    ]
+    for claim in feedback.unsupported_claims:
+        values.extend([claim.claim, claim.reason, claim.suggested_fix or ""])
+    for value in values:
+        for numeric_claim in NUMERIC_CLAIM_PATTERN.finditer(value or ""):
+            if numeric_claim.group(0).casefold() not in answer_grounding:
+                raise ValueError("Practice feedback contains an unsupported numeric claim.")
+
+
+def _validate_practice_source_refs(
+    *,
+    feedback: PracticeFeedbackOutput,
+    question: dict,
+    linked_story: dict | None,
+    approved_evidence: list[dict],
+    prepkit_context: dict,
+) -> None:
+    evidence_ids = {int(item["id"]) for item in approved_evidence if item.get("id") is not None}
+    story_id = (
+        int(linked_story["id"]) if linked_story and linked_story.get("id") is not None else None
+    )
+    question_id = str(question.get("question_id") or "")
+    refs = list(feedback.source_refs)
+    for claim in feedback.unsupported_claims:
+        refs.extend(claim.source_refs)
+    for ref in refs:
+        if (
+            ref.source_type == "question"
+            and ref.source_id is not None
+            and str(ref.source_id) != question_id
+        ):
+            raise ValueError("Practice feedback references an unknown question.")
+        if (
+            ref.source_type == "story"
+            and ref.source_id is not None
+            and int(ref.source_id) != story_id
+        ):
+            raise ValueError("Practice feedback references an unknown story.")
+        if (
+            ref.source_type == "evidence"
+            and ref.source_id is not None
+            and int(ref.source_id) not in evidence_ids
+        ):
+            raise ValueError("Practice feedback references unknown evidence.")
+        if (
+            ref.source_type == "prepkit"
+            and ref.source_id is not None
+            and str(ref.source_id) != str(prepkit_context.get("id"))
+        ):
+            raise ValueError("Practice feedback references an unknown Prep Kit.")

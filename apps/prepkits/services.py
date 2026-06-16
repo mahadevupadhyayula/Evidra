@@ -148,9 +148,7 @@ class PrepKitService:
                 evidence=context["evidence"],
                 grounding_payload=payload,
             )
-            artifact = service.generate_prepkit_artifact(
-                **payload, analysis=analysis.model_dump()
-            )
+            artifact = service.generate_prepkit_artifact(**payload, analysis=analysis.model_dump())
             PrepKitService._validate_output(
                 output=artifact,
                 matches=context["matches"],
@@ -414,7 +412,11 @@ class PrepKitService:
     @staticmethod
     def _require_paid_access(*, user, sprint: InterviewSprint) -> Payment:
         PrepKitService._require_owned_access(user=user, sprint=sprint)
-        if SprintState(sprint.state) not in {SprintState.PAID, SprintState.PREPKIT_READY}:
+        if SprintState(sprint.state) not in {
+            SprintState.PAID,
+            SprintState.PREPKIT_READY,
+            SprintState.PRACTICE_ACTIVE,
+        }:
             raise InvalidSprintTransition(f"Cannot use Prep Kit while Sprint is in {sprint.state}.")
         payment = (
             Payment.objects.filter(user=user, sprint=sprint, status=PaymentStatus.PAID)

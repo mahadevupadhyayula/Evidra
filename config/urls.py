@@ -20,6 +20,7 @@ urlpatterns = [
     path("workspace/preview/", include("apps.previews.urls")),
     path("workspace/payment/", include("apps.payments.urls")),
     path("workspace/prepkit/", include("apps.prepkits.urls")),
+    path("workspace/practice/", include("apps.practice.urls")),
     path("workspace/resume/", include("apps.documents.urls")),
     path("workspace/stories/", include("apps.stories.urls")),
     path("workspace/", include("apps.workspace.urls")),
