@@ -1,0 +1,28 @@
+<section class="card" id="payment-status-card"
+  {% if not payment or payment.status == "ORDER_CREATED" or payment.status == "PAYMENT_PENDING" %}
+    hx-get="{% url 'payments:status_poll' %}"
+    hx-trigger="load, every 5s"
+    hx-swap="outerHTML"
+  {% endif %}>
+  <p class="eyebrow">Payment status</p>
+  {% if payment %}
+    <h1>{{ payment.get_status_display }}</h1>
+    <p><strong>Order:</strong> {{ payment.provider_order_id|default:"Not created" }}</p>
+    <p><strong>Amount:</strong> {{ payment.amount }} {{ payment.currency }}</p>
+    {% if payment.status == "PAID" %}
+      <p>Your payment has been verified by Razorpay webhook. Prep Kit generation will become available in the next stage.</p>
+    {% elif payment.status == "FAILED" %}
+      <p>Payment failed. Your profile, evidence, stories, matches and preview are preserved.</p>
+      {% if payment.failure_message %}<p class="helptext">{{ payment.failure_message }}</p>{% endif %}
+      <form method="post" action="{% url 'payments:retry' %}">
+        {% csrf_token %}
+        <button type="submit">Retry payment</button>
+      </form>
+    {% else %}
+      <p>Waiting for a verified Razorpay webhook. Browser redirects or polling do not unlock paid access.</p>
+    {% endif %}
+  {% else %}
+    <h1>No payment order yet</h1>
+    <p>Create a checkout order from your readiness preview.</p>
+  {% endif %}
+</section>

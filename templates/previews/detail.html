@@ -88,8 +88,14 @@
     <section class="card">
       <h2>Paid Prep Kit</h2>
       <p>{{ preview.prepkit_explanation }}</p>
-      <button type="button" disabled>Checkout coming soon</button>
-      <p class="helptext">Payment is not available in this stage. No order has been created.</p>
+      {% if sprint.state == "PREVIEW_READY" or sprint.state == "PAYMENT_PENDING" %}
+        <form method="post" action="{% url 'payments:checkout' %}">
+          {% csrf_token %}
+          <button type="submit">Create Razorpay order</button>
+        </form>
+        <p><a href="{% url 'payments:status' %}">Check payment status</a></p>
+        <p class="helptext">Payment gates only the Prep Kit. Your profile, approved evidence, stories and preview remain available.</p>
+      {% endif %}
     </section>
   {% else %}
     <section class="card">

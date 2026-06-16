@@ -63,7 +63,7 @@ def test_preview_detail_displays_sections_and_placeholder(client):
     assert response.status_code == 200
     content = response.content.decode()
     assert "Role summary" in content
-    assert "Checkout coming soon" in content
+    assert "Create Razorpay order" in content
     assert "offer probability" not in content.casefold()
 
 
