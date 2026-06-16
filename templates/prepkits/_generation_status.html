@@ -1,0 +1,46 @@
+<section class="card" id="prepkit-status-card"
+  {% if generation_run and generation_run.status == "PENDING" or generation_run and generation_run.status == "RUNNING" %}
+    hx-get="{% url 'prepkits:status' %}"
+    hx-trigger="load, every 5s"
+    hx-swap="outerHTML"
+  {% endif %}>
+  <p class="eyebrow">Prep Kit status</p>
+  {% if access_error %}
+    <h2>Prep Kit locked</h2>
+    <p>{{ access_error }}</p>
+    <p><a href="{% url 'payments:status' %}">View payment status</a></p>
+  {% elif prepkit and prepkit.status == "READY" %}
+    <h2>Prep Kit ready</h2>
+    <p>Your paid Prep Kit is ready for this Sprint.</p>
+    <p><a href="{% url 'prepkits:print' %}">Open print-friendly report</a></p>
+  {% elif latest_prepkit and latest_prepkit.status == "FAILED" %}
+    <h2>Generation failed</h2>
+    <p>Your paid entitlement is preserved. You can retry generation.</p>
+    {% if prepkit %}<p>Your previous Prep Kit remains available below.</p>{% endif %}
+    {% if latest_prepkit.error_message %}<p class="helptext">{{ latest_prepkit.error_message }}</p>{% endif %}
+    <form method="post" action="{% url 'prepkits:retry' %}">
+      {% csrf_token %}
+      <button type="submit">Retry Prep Kit generation</button>
+    </form>
+  {% elif generation_run and generation_run.status == "FAILED" %}
+    <h2>Generation failed</h2>
+    <p>Your paid entitlement is preserved. You can retry generation.</p>
+    {% if prepkit %}<p>Your previous Prep Kit remains available below.</p>{% endif %}
+    {% if generation_run.error_message %}<p class="helptext">{{ generation_run.error_message }}</p>{% endif %}
+    <form method="post" action="{% url 'prepkits:retry' %}">
+      {% csrf_token %}
+      <button type="submit">Retry Prep Kit generation</button>
+    </form>
+  {% elif generation_run and generation_run.status == "PENDING" or generation_run and generation_run.status == "RUNNING" %}
+    <h2>Generation in progress</h2>
+    {% if prepkit %}<p>Your previous Prep Kit remains available while the new one runs.</p>{% endif %}
+    <p>Your Prep Kit is being generated from approved evidence, stories, matching and preview inputs.</p>
+  {% else %}
+    <h2>Generate your paid Prep Kit</h2>
+    <p>Verified payment is required. The report will be generated from approved evidence only.</p>
+    <form method="post" action="{% url 'prepkits:generate' %}">
+      {% csrf_token %}
+      <button type="submit">Generate Prep Kit</button>
+    </form>
+  {% endif %}
+</section>

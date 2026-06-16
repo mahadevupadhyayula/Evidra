@@ -424,6 +424,36 @@ class SprintWorkflowService:
             return locked_sprint
 
     @staticmethod
+    def mark_prepkit_ready(*, user, sprint: InterviewSprint, prepkit) -> InterviewSprint:
+        if (
+            not user.is_authenticated
+            or sprint.user_id != user.id
+            or prepkit.sprint_id != sprint.id
+            or prepkit.sprint.user_id != user.id
+        ):
+            raise SprintOwnershipError("Sprint or Prep Kit is not owned by this user.")
+        if prepkit.status != "READY" or prepkit.generated_at is None:
+            raise SprintTransitionConditionMissing("A ready Prep Kit is required.")
+        from apps.prepkits.services import PrepKitService
+
+        current_revision = PrepKitService.current_input_revision(user=user, sprint=sprint)
+        if prepkit.input_revision != current_revision:
+            raise SprintTransitionConditionMissing("A current Prep Kit is required.")
+
+        with transaction.atomic():
+            locked_sprint = InterviewSprint.objects.select_for_update().get(pk=sprint.pk, user=user)
+            current_state = SprintState(locked_sprint.state)
+            if current_state == SprintState.PREPKIT_READY:
+                return locked_sprint
+            if current_state != SprintState.PAID:
+                raise InvalidSprintTransition(
+                    f"Cannot mark Prep Kit ready while Sprint is in {current_state}."
+                )
+            locked_sprint.state = SprintState.PREPKIT_READY
+            locked_sprint.save(update_fields=["state", "updated_at"])
+            return locked_sprint
+
+    @staticmethod
     def _validate_expected_payment_terms(*, payment) -> None:
         expected_amount = int(getattr(settings, "INTERVIEW_SPRINT_PRICE_AMOUNT", 0) or 0)
         expected_currency = (

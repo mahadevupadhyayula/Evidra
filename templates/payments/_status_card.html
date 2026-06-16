@@ -10,7 +10,7 @@
     <p><strong>Order:</strong> {{ payment.provider_order_id|default:"Not created" }}</p>
     <p><strong>Amount:</strong> {{ payment.amount }} {{ payment.currency }}</p>
     {% if payment.status == "PAID" %}
-      <p>Your payment has been verified by Razorpay webhook. Prep Kit generation will become available in the next stage.</p>
+      <p>Your payment has been verified by Razorpay webhook. <a href="{% url 'prepkits:detail' %}">Generate your paid Prep Kit</a>.</p>
     {% elif payment.status == "FAILED" %}
       <p>Payment failed. Your profile, evidence, stories, matches and preview are preserved.</p>
       {% if payment.failure_message %}<p class="helptext">{{ payment.failure_message }}</p>{% endif %}

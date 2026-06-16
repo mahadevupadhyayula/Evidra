@@ -318,6 +318,7 @@ class EvidenceService:
             edited_data.pop("metric_user_corrected", None)
         card.user_edited_data = edited_data
         card.save(update_fields=[*CARD_EDITABLE_FIELDS, "status", "user_edited_data", "updated_at"])
+        EvidenceService._mark_prepkit_stale(user=user, sprint=sprint)
         return card
 
     @staticmethod
@@ -334,6 +335,7 @@ class EvidenceService:
         card.status = EvidenceStatus.APPROVED
         card.missing_details = []
         card.save(update_fields=["status", "missing_details", "updated_at"])
+        EvidenceService._mark_prepkit_stale(user=user, sprint=sprint)
         return card
 
     @staticmethod
@@ -342,7 +344,14 @@ class EvidenceService:
         card = EvidenceService.get_owned_card(user=user, sprint=sprint, card_id=card_id)
         card.status = EvidenceStatus.REJECTED
         card.save(update_fields=["status", "updated_at"])
+        EvidenceService._mark_prepkit_stale(user=user, sprint=sprint)
         return card
+
+    @staticmethod
+    def _mark_prepkit_stale(*, user, sprint: InterviewSprint) -> None:
+        from apps.prepkits.services import PrepKitService
+
+        PrepKitService.mark_stale_for_sprint(user=user, sprint=sprint)
 
     @staticmethod
     def approve_evidence_set(*, user, sprint: InterviewSprint) -> EvidenceThresholdResult:

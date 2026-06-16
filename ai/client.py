@@ -11,6 +11,7 @@ from ai.schemas.company_context import CompanyContext
 from ai.schemas.evidence import ExtractedEvidenceSet
 from ai.schemas.jd import JDAnalysis
 from ai.schemas.matching import StoryMatchSet
+from ai.schemas.prepkit import PrepKitAnalysisOutput, PrepKitArtifactOutput
 from ai.schemas.preview import ReadinessPreviewOutput
 from ai.schemas.profile import ExtractedProfile
 from ai.schemas.stories import GeneratedStorySet, StoryScoreSet
@@ -100,6 +101,37 @@ class PreviewGenerationClient(Protocol):
         retry_context: str | None = None,
     ) -> dict:
         """Return raw readiness preview data for schema validation."""
+
+
+class PrepKitAnalysisClient(Protocol):
+    def generate_prepkit_analysis(
+        self,
+        *,
+        opportunity_context: dict,
+        role_pack: dict,
+        matches: list[dict],
+        stories: list[dict],
+        approved_evidence: list[dict],
+        preview: dict,
+        retry_context: str | None = None,
+    ) -> dict:
+        """Return raw Prep Kit analysis data for schema validation."""
+
+
+class PrepKitArtifactClient(Protocol):
+    def generate_prepkit_artifact(
+        self,
+        *,
+        opportunity_context: dict,
+        role_pack: dict,
+        matches: list[dict],
+        stories: list[dict],
+        approved_evidence: list[dict],
+        preview: dict,
+        analysis: dict,
+        retry_context: str | None = None,
+    ) -> dict:
+        """Return raw Prep Kit artifact data for schema validation."""
 
 
 class JDAnalysisClient(Protocol):
@@ -468,6 +500,156 @@ class MockAIClient:
             raise response
         return response
 
+    def generate_prepkit_analysis(
+        self,
+        *,
+        opportunity_context: dict,
+        role_pack: dict,
+        matches: list[dict],
+        stories: list[dict],
+        approved_evidence: list[dict],
+        preview: dict,
+        retry_context: str | None = None,
+    ) -> dict:
+        self.calls.append(
+            {
+                "operation": "generate_prepkit_analysis",
+                "opportunity_context": opportunity_context,
+                "role_pack": role_pack,
+                "matches": matches,
+                "stories": stories,
+                "approved_evidence": approved_evidence,
+                "preview": preview,
+                "retry_context": retry_context,
+            }
+        )
+        if not self.responses:
+            evidence_id = int(approved_evidence[0]["id"])
+            story_id = int(stories[0]["id"])
+            match_id = int(matches[0]["id"])
+            ref = {"source_type": "evidence", "source_id": evidence_id, "source_field": "title"}
+            item = {
+                "title": "Grounded preparation focus",
+                "detail": "Use the approved story and evidence to prepare for this role.",
+                "source_refs": [ref],
+                "evidence_ids": [evidence_id],
+                "story_ids": [story_id],
+                "match_ids": [match_id],
+            }
+            return {
+                "role_briefing_points": [item],
+                "fit_findings": [item],
+                "competency_findings": [item],
+                "story_recommendations": [item],
+                "question_themes": [item],
+                "concern_findings": [item],
+                "missing_evidence_findings": [item],
+                "practice_priority_findings": [item],
+                "seven_day_focus_areas": [item],
+                "checklist_findings": [item],
+            }
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    def generate_prepkit_artifact(
+        self,
+        *,
+        opportunity_context: dict,
+        role_pack: dict,
+        matches: list[dict],
+        stories: list[dict],
+        approved_evidence: list[dict],
+        preview: dict,
+        analysis: dict,
+        retry_context: str | None = None,
+    ) -> dict:
+        self.calls.append(
+            {
+                "operation": "generate_prepkit_artifact",
+                "opportunity_context": opportunity_context,
+                "role_pack": role_pack,
+                "matches": matches,
+                "stories": stories,
+                "approved_evidence": approved_evidence,
+                "preview": preview,
+                "analysis": analysis,
+                "retry_context": retry_context,
+            }
+        )
+        if not self.responses:
+            evidence_id = int(approved_evidence[0]["id"])
+            story_id = int(stories[0]["id"])
+            match_id = int(matches[0]["id"])
+            ref = {"source_type": "evidence", "source_id": evidence_id, "source_field": "title"}
+            item = {
+                "title": "Grounded preparation focus",
+                "detail": "Use the approved story and evidence to prepare for this role.",
+                "source_refs": [ref],
+                "evidence_ids": [evidence_id],
+                "story_ids": [story_id],
+                "match_ids": [match_id],
+            }
+            return {
+                "role_briefing": {
+                    "role_title": opportunity_context.get("role_title") or "Target role",
+                    "company_name": opportunity_context.get("company_name"),
+                    "briefing": (
+                        "Prepare for the confirmed role using approved evidence and "
+                        "matched stories."
+                    ),
+                    "source_refs": [ref],
+                },
+                "fit_summary": {
+                    "summary": "Your fit is grounded in approved stories.",
+                    "strengths": [item],
+                    "gaps": [item],
+                },
+                "competency_coverage": [
+                    {
+                        **item,
+                        "competency_key": matches[0].get("competency_key") or "competency",
+                        "coverage_level": "covered",
+                    }
+                ],
+                "story_map": [
+                    {**item, "recommended_story_id": story_id, "question_types": ["Behavioral"]}
+                ],
+                "question_bank": [
+                    {
+                        **item,
+                        "question": "Tell me about the approved story.",
+                        "recommended_story_id": story_id,
+                        "priority": "high",
+                    }
+                ],
+                "concern_map": [
+                    {**item, "concern": opportunity_context.get("concerns") or "Role readiness"}
+                ],
+                "missing_evidence": [
+                    {
+                        **item,
+                        "suggested_detail": "Add more detail if the interviewer asks for depth.",
+                    }
+                ],
+                "practice_priorities": [{**item, "priority_order": 1}],
+                "seven_day_plan": [
+                    {
+                        "day_number": day,
+                        "focus": "Focused preparation",
+                        "tasks": [item],
+                    }
+                    for day in range(1, 8)
+                ],
+                "interview_checklist": [{**item, "category": "stories"}],
+            }
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+
     def analyze_jd(
         self,
         *,
@@ -608,6 +790,102 @@ class OpenAIProfileClient:
             raise AIClientError("Profile extraction failed.") from exc
         if not isinstance(parsed, dict):
             raise AIClientError("Profile extraction returned invalid JSON.")
+        return parsed
+
+    def generate_prepkit_analysis(
+        self,
+        *,
+        opportunity_context: dict,
+        role_pack: dict,
+        matches: list[dict],
+        stories: list[dict],
+        approved_evidence: list[dict],
+        preview: dict,
+        retry_context: str | None = None,
+    ) -> dict:
+        from ai.prompts.prepkit import ANALYSIS_SYSTEM_PROMPT
+
+        prompt = ANALYSIS_SYSTEM_PROMPT
+        if retry_context:
+            prompt += f" Previous output was structurally invalid: {retry_context}."
+        user_payload = {
+            "opportunity_context": opportunity_context,
+            "role_pack": role_pack,
+            "matches": matches,
+            "stories": stories,
+            "approved_evidence": approved_evidence,
+            "preview": preview,
+        }
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "prepkit_analysis",
+                        "schema": PrepKitAnalysisOutput.model_json_schema(),
+                        "strict": True,
+                    },
+                },
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": json.dumps(user_payload)},
+                ],
+            )
+            parsed = json.loads(response.choices[0].message.content or "{}")
+        except Exception as exc:  # noqa: BLE001
+            raise AIClientError("Prep Kit analysis generation failed.") from exc
+        if not isinstance(parsed, dict):
+            raise AIClientError("Prep Kit analysis generation returned invalid JSON.")
+        return parsed
+
+    def generate_prepkit_artifact(
+        self,
+        *,
+        opportunity_context: dict,
+        role_pack: dict,
+        matches: list[dict],
+        stories: list[dict],
+        approved_evidence: list[dict],
+        preview: dict,
+        analysis: dict,
+        retry_context: str | None = None,
+    ) -> dict:
+        from ai.prompts.prepkit import ARTIFACT_SYSTEM_PROMPT
+
+        prompt = ARTIFACT_SYSTEM_PROMPT
+        if retry_context:
+            prompt += f" Previous output was structurally invalid: {retry_context}."
+        user_payload = {
+            "opportunity_context": opportunity_context,
+            "role_pack": role_pack,
+            "matches": matches,
+            "stories": stories,
+            "approved_evidence": approved_evidence,
+            "preview": preview,
+            "analysis": analysis,
+        }
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "prepkit_artifact",
+                        "schema": PrepKitArtifactOutput.model_json_schema(),
+                        "strict": True,
+                    },
+                },
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": json.dumps(user_payload)},
+                ],
+            )
+            parsed = json.loads(response.choices[0].message.content or "{}")
+        except Exception as exc:  # noqa: BLE001
+            raise AIClientError("Prep Kit artifact generation failed.") from exc
+        if not isinstance(parsed, dict):
+            raise AIClientError("Prep Kit artifact generation returned invalid JSON.")
         return parsed
 
 

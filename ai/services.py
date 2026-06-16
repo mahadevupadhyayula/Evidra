@@ -15,6 +15,8 @@ from ai.client import (
     OpenAIJDClient,
     OpenAIProfileClient,
     OpenAIStoryClient,
+    PrepKitAnalysisClient,
+    PrepKitArtifactClient,
     PreviewGenerationClient,
     ProfileExtractionClient,
     StoryGenerationClient,
@@ -25,6 +27,7 @@ from ai.schemas.company_context import CompanyContext
 from ai.schemas.evidence import ExtractedEvidenceSet
 from ai.schemas.jd import JDAnalysis
 from ai.schemas.matching import StoryMatchSet
+from ai.schemas.prepkit import PrepKitAnalysisOutput, PrepKitArtifactOutput
 from ai.schemas.preview import ReadinessPreviewOutput
 from ai.schemas.profile import ExtractedProfile
 from ai.schemas.stories import GeneratedStorySet, StoryScoreSet
@@ -60,6 +63,14 @@ class AIStoryMatchScoringError(RuntimeError):
 
 class AIPreviewGenerationError(RuntimeError):
     """Raised when readiness preview generation cannot produce valid structured output."""
+
+
+class AIPrepKitAnalysisError(RuntimeError):
+    """Raised when Prep Kit analysis cannot produce valid structured output."""
+
+
+class AIPrepKitArtifactError(RuntimeError):
+    """Raised when Prep Kit artifact generation cannot produce valid structured output."""
 
 
 NUMERIC_CLAIM_PATTERN = re.compile(r"\b\d+(?:[,.]\d+)?%?\b")
@@ -141,6 +152,8 @@ class EvidraAIService:
         | StoryScoringClient
         | StoryMatchScoringClient
         | PreviewGenerationClient
+        | PrepKitAnalysisClient
+        | PrepKitArtifactClient
         | None
     ) = None
 
@@ -412,6 +425,80 @@ class EvidraAIService:
                 retry_context = str(exc)
         raise AIPreviewGenerationError(
             "Readiness preview generation returned invalid structured output."
+        ) from last_error
+
+    def generate_prepkit_analysis(
+        self,
+        *,
+        opportunity_context: dict,
+        role_pack: dict,
+        matches: list[dict],
+        stories: list[dict],
+        approved_evidence: list[dict],
+        preview: dict,
+    ) -> PrepKitAnalysisOutput:
+        if not matches or not stories or not approved_evidence:
+            raise AIPrepKitAnalysisError("Matches, stories, and approved evidence are required.")
+        client = self.client or OpenAIStoryClient()
+        if not hasattr(client, "generate_prepkit_analysis"):
+            raise AIPrepKitAnalysisError("Prep Kit analysis client is not configured.")
+        last_error: Exception | None = None
+        retry_context: str | None = None
+        for _attempt in range(2):
+            try:
+                raw_analysis = client.generate_prepkit_analysis(
+                    opportunity_context=opportunity_context,
+                    role_pack=role_pack,
+                    matches=matches,
+                    stories=stories,
+                    approved_evidence=approved_evidence,
+                    preview=preview,
+                    retry_context=retry_context,
+                )
+                return PrepKitAnalysisOutput.model_validate(raw_analysis)
+            except (AIClientError, ValidationError, ValueError) as exc:
+                last_error = exc
+                retry_context = str(exc)
+        raise AIPrepKitAnalysisError(
+            "Prep Kit analysis generation returned invalid structured output."
+        ) from last_error
+
+    def generate_prepkit_artifact(
+        self,
+        *,
+        opportunity_context: dict,
+        role_pack: dict,
+        matches: list[dict],
+        stories: list[dict],
+        approved_evidence: list[dict],
+        preview: dict,
+        analysis: dict,
+    ) -> PrepKitArtifactOutput:
+        if not matches or not stories or not approved_evidence:
+            raise AIPrepKitArtifactError("Matches, stories, and approved evidence are required.")
+        client = self.client or OpenAIStoryClient()
+        if not hasattr(client, "generate_prepkit_artifact"):
+            raise AIPrepKitArtifactError("Prep Kit artifact client is not configured.")
+        last_error: Exception | None = None
+        retry_context: str | None = None
+        for _attempt in range(2):
+            try:
+                raw_artifact = client.generate_prepkit_artifact(
+                    opportunity_context=opportunity_context,
+                    role_pack=role_pack,
+                    matches=matches,
+                    stories=stories,
+                    approved_evidence=approved_evidence,
+                    preview=preview,
+                    analysis=analysis,
+                    retry_context=retry_context,
+                )
+                return PrepKitArtifactOutput.model_validate(raw_artifact)
+            except (AIClientError, ValidationError, ValueError) as exc:
+                last_error = exc
+                retry_context = str(exc)
+        raise AIPrepKitArtifactError(
+            "Prep Kit artifact generation returned invalid structured output."
         ) from last_error
 
     def analyze_jd(

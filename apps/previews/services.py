@@ -172,8 +172,15 @@ class ReadinessPreviewService:
                     if key != "sprint":
                         setattr(preview, key, value)
                 preview.save()
+            ReadinessPreviewService._mark_prepkit_stale(user=user, sprint=sprint)
             SprintWorkflowService.mark_preview_ready(user=user, sprint=sprint, preview=preview)
         return ReadinessPreviewService.current_preview(user=user, sprint=sprint) or preview
+
+    @staticmethod
+    def _mark_prepkit_stale(*, user, sprint: InterviewSprint) -> None:
+        from apps.prepkits.services import PrepKitService
+
+        PrepKitService.mark_stale_for_sprint(user=user, sprint=sprint)
 
     @staticmethod
     def build_input_revision(

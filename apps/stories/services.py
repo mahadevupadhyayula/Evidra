@@ -309,6 +309,9 @@ class StoryService:
 
     @staticmethod
     def _invalidate_matching_outputs(*, user, sprint: InterviewSprint) -> None:
+        from apps.prepkits.services import PrepKitService
+
+        PrepKitService.mark_stale_for_sprint(user=user, sprint=sprint)
         if sprint.state != SprintState.MATCHING_READY:
             return
         from apps.matching.models import StoryMatch

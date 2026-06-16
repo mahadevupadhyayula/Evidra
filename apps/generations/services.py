@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from ai.services import AIPreviewGenerationError, EvidraAIService
 from apps.generations.models import GenerationOperation, GenerationRun, GenerationRunStatus
+from apps.prepkits.services import PrepKitError, PrepKitService
 from apps.previews.services import ReadinessPreviewError, ReadinessPreviewService
 from apps.sprints.models import InterviewSprint, SprintState
 from apps.sprints.services import (
@@ -30,7 +31,7 @@ class GenerationRunProcessingError(RuntimeError):
 class GenerationRunService:
     ABANDONED_AFTER_MINUTES = 30
     MAX_WORKER_ATTEMPTS = 2
-    STRUCTURAL_ERROR_TYPES = (AIPreviewGenerationError, ReadinessPreviewError)
+    STRUCTURAL_ERROR_TYPES = (AIPreviewGenerationError, ReadinessPreviewError, PrepKitError)
 
     @staticmethod
     def enqueue_preview(*, user, sprint: InterviewSprint, force: bool = False) -> GenerationRun:
@@ -92,6 +93,91 @@ class GenerationRunService:
             if existing is not None:
                 return existing
             raise
+
+    @staticmethod
+    def enqueue_prepkit(*, user, sprint: InterviewSprint, force: bool = False) -> GenerationRun:
+        PrepKitService._require_paid_access(user=user, sprint=sprint)
+        input_revision = PrepKitService.current_input_revision(user=user, sprint=sprint)
+        if not force:
+            existing_ready = PrepKitService.current_prepkit(user=user, sprint=sprint)
+            if existing_ready and existing_ready.input_revision == input_revision:
+                return GenerationRunService._get_or_create_succeeded_run(
+                    sprint=sprint,
+                    operation=GenerationOperation.GENERATE_PREPKIT,
+                    input_revision=input_revision,
+                )
+        operation = GenerationOperation.GENERATE_PREPKIT
+        try:
+            with transaction.atomic():
+                GenerationRun.objects.select_for_update().filter(
+                    sprint=sprint,
+                    sprint__user=user,
+                    operation=operation,
+                    status__in=GenerationRun.ACTIVE_STATUSES,
+                ).exclude(input_revision=input_revision).update(
+                    status=GenerationRunStatus.STALE,
+                    error_code="INPUTS_CHANGED",
+                    error_message="Inputs changed before this generation could finish.",
+                    completed_at=timezone.now(),
+                )
+                if force:
+                    GenerationRun.objects.select_for_update().filter(
+                        sprint=sprint,
+                        sprint__user=user,
+                        operation=operation,
+                        input_revision=input_revision,
+                        status__in=GenerationRun.ACTIVE_STATUSES,
+                    ).update(
+                        status=GenerationRunStatus.FAILED,
+                        error_code="RETRY_REQUESTED",
+                        error_message="Retry requested by the user.",
+                        completed_at=timezone.now(),
+                    )
+                existing = (
+                    GenerationRun.objects.select_for_update()
+                    .filter(
+                        sprint=sprint,
+                        sprint__user=user,
+                        operation=operation,
+                        input_revision=input_revision,
+                        status__in=GenerationRun.ACTIVE_STATUSES,
+                    )
+                    .order_by("created_at", "id")
+                    .first()
+                )
+                if existing is not None:
+                    return existing
+                return GenerationRun.objects.create(
+                    sprint=sprint,
+                    operation=operation,
+                    input_revision=input_revision,
+                    status=GenerationRunStatus.PENDING,
+                )
+        except IntegrityError:
+            existing = GenerationRun.objects.filter(
+                sprint=sprint,
+                sprint__user=user,
+                operation=operation,
+                input_revision=input_revision,
+                status__in=GenerationRun.ACTIVE_STATUSES,
+            ).first()
+            if existing is not None:
+                return existing
+            raise
+
+    @staticmethod
+    def current_prepkit_run(*, user, sprint: InterviewSprint) -> GenerationRun | None:
+        if not user.is_authenticated or sprint.user_id != user.id:
+            raise SprintOwnershipError("Sprint is not owned by this user.")
+        return (
+            GenerationRun.objects.filter(
+                sprint=sprint,
+                sprint__user=user,
+                operation=GenerationOperation.GENERATE_PREPKIT,
+            )
+            .order_by("-created_at", "-id")
+            .first()
+        )
 
     @staticmethod
     def current_preview_run(*, user, sprint: InterviewSprint) -> GenerationRun | None:
@@ -174,6 +260,13 @@ class GenerationRunService:
         try:
             if run.operation == GenerationOperation.GENERATE_PREVIEW:
                 ReadinessPreviewService.generate_preview(
+                    user=run.sprint.user,
+                    sprint=run.sprint,
+                    ai_service=ai_service,
+                    force=True,
+                )
+            elif run.operation == GenerationOperation.GENERATE_PREPKIT:
+                PrepKitService.generate_prepkit(
                     user=run.sprint.user,
                     sprint=run.sprint,
                     ai_service=ai_service,
@@ -351,12 +444,17 @@ class GenerationRunService:
 
     @staticmethod
     def _run_matches_current_input_revision(*, run: GenerationRun) -> bool:
-        if run.operation != GenerationOperation.GENERATE_PREVIEW:
-            return False
         try:
-            current_revision = GenerationRunService.current_preview_input_revision(
-                user=run.sprint.user, sprint=run.sprint
-            )
+            if run.operation == GenerationOperation.GENERATE_PREVIEW:
+                current_revision = GenerationRunService.current_preview_input_revision(
+                    user=run.sprint.user, sprint=run.sprint
+                )
+            elif run.operation == GenerationOperation.GENERATE_PREPKIT:
+                current_revision = PrepKitService.current_input_revision(
+                    user=run.sprint.user, sprint=run.sprint
+                )
+            else:
+                return False
         except (
             InvalidSprintTransition,
             SprintOwnershipError,
