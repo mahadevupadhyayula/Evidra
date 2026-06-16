@@ -4,6 +4,7 @@ from django.db.models import Q
 
 class GenerationOperation(models.TextChoices):
     GENERATE_PREVIEW = "GENERATE_PREVIEW", "Generate readiness preview"
+    GENERATE_PREPKIT = "GENERATE_PREPKIT", "Generate paid Prep Kit"
 
 
 class GenerationRunStatus(models.TextChoices):

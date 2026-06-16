@@ -139,6 +139,7 @@ class OpportunityService:
             opportunity.company_context_status = CompanyContextStatus.PENDING_REVIEW
             update_fields.append("company_context_status")
         opportunity.save(update_fields=update_fields)
+        OpportunityService._mark_prepkit_stale(user=user, sprint=sprint)
         return opportunity
 
     @staticmethod
@@ -176,6 +177,7 @@ class OpportunityService:
                 "updated_at",
             ]
         )
+        OpportunityService._mark_prepkit_stale(user=user, sprint=sprint)
         return opportunity
 
     @staticmethod
@@ -211,6 +213,7 @@ class OpportunityService:
                 "updated_at",
             ]
         )
+        OpportunityService._mark_prepkit_stale(user=user, sprint=sprint)
         return opportunity
 
 
@@ -234,6 +237,7 @@ class OpportunityService:
         opportunity.company_context = context.model_dump(mode="json")
         opportunity.company_context_status = CompanyContextStatus.PENDING_REVIEW
         opportunity.save(update_fields=["company_context", "company_context_status", "updated_at"])
+        OpportunityService._mark_prepkit_stale(user=user, sprint=sprint)
         return opportunity
 
     @staticmethod
@@ -245,6 +249,7 @@ class OpportunityService:
             raise OpportunityError("Review extracted company context before confirming it.")
         opportunity.company_context_status = CompanyContextStatus.CONFIRMED
         opportunity.save(update_fields=["company_context_status", "updated_at"])
+        OpportunityService._mark_prepkit_stale(user=user, sprint=sprint)
         return opportunity
 
     @staticmethod
@@ -258,6 +263,7 @@ class OpportunityService:
             )
         opportunity.company_context_status = CompanyContextStatus.SKIPPED
         opportunity.save(update_fields=["company_context_status", "updated_at"])
+        OpportunityService._mark_prepkit_stale(user=user, sprint=sprint)
         return opportunity
 
     @staticmethod
@@ -289,7 +295,14 @@ class OpportunityService:
                 sprint=sprint,
                 opportunity=opportunity,
             )
+            OpportunityService._mark_prepkit_stale(user=user, sprint=sprint)
             return opportunity
+
+    @staticmethod
+    def _mark_prepkit_stale(*, user, sprint: InterviewSprint) -> None:
+        from apps.prepkits.services import PrepKitService
+
+        PrepKitService.mark_stale_for_sprint(user=user, sprint=sprint)
 
     @staticmethod
     def _require_owned_sprint(*, user, sprint: InterviewSprint) -> None:

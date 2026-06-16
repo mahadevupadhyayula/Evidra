@@ -1,0 +1,10 @@
+{% if item.source_refs or item.evidence_ids or item.story_ids or item.match_ids %}
+  <p class="helptext">Sources:
+    {% for ref in item.source_refs %}
+      {{ ref.source_type }}{% if ref.source_id %} #{{ ref.source_id }}{% endif %}{% if ref.source_field %} · {{ ref.source_field }}{% endif %}{% if ref.excerpt %} — “{{ ref.excerpt }}”{% endif %}{% if not forloop.last %}; {% endif %}
+    {% endfor %}
+    {% if item.evidence_ids %} Evidence {{ item.evidence_ids|join:", " }}.{% endif %}
+    {% if item.story_ids %} Stories {{ item.story_ids|join:", " }}.{% endif %}
+    {% if item.match_ids %} Matches {{ item.match_ids|join:", " }}.{% endif %}
+  </p>
+{% endif %}

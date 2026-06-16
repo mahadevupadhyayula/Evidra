@@ -161,6 +161,7 @@ class MatchingService:
                 sprint=sprint,
                 has_matches_or_gaps=bool(created),
             )
+            MatchingService._mark_prepkit_stale(user=user, sprint=sprint)
         return MatchingService.list_matches(user=user, sprint=sprint)
 
     @staticmethod
@@ -184,6 +185,7 @@ class MatchingService:
             match.user_selected = False
             match.selected_story = None
             match.save(update_fields=["user_selected", "selected_story"])
+            MatchingService._mark_prepkit_stale(user=user, sprint=sprint)
             return match
         valid_story_ids = {
             sid for sid in [match.primary_story_id, match.alternative_story_id] if sid
@@ -193,7 +195,14 @@ class MatchingService:
         match.selected_story_id = int(story_id)
         match.user_selected = True
         match.save(update_fields=["selected_story", "user_selected"])
+        MatchingService._mark_prepkit_stale(user=user, sprint=sprint)
         return match
+
+    @staticmethod
+    def _mark_prepkit_stale(*, user, sprint: InterviewSprint) -> None:
+        from apps.prepkits.services import PrepKitService
+
+        PrepKitService.mark_stale_for_sprint(user=user, sprint=sprint)
 
     @staticmethod
     def calculate_total_score(

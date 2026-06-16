@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Print Prep Kit · Evidra{% endblock %}
+{% block content %}
+  {% if prepkit.status == "STALE" %}<section class="card"><p class="helptext">This Prep Kit is from earlier inputs.</p></section>{% endif %}
+  <section class="card">
+    <p class="eyebrow">Print-friendly Prep Kit</p>
+    <h1>{{ prepkit.role_briefing.role_title }}</h1>
+    <p>{{ prepkit.role_briefing.briefing }}</p>
+    {% with item=prepkit.role_briefing %}{% include "prepkits/_source_refs.html" %}{% endwith %}
+    <p class="helptext">Use your browser print command. PDF generation is not part of this MBP stage.</p>
+  </section>
+  <section class="card"><h2>Fit summary</h2><p>{{ prepkit.fit_summary.summary }}</p>{% for item in prepkit.fit_summary.strengths %}{% include "prepkits/_source_refs.html" %}{% endfor %}</section>
+  <section class="card"><h2>Competency coverage</h2><ul>{% for item in prepkit.competency_coverage %}<li>{{ item.title }} — {{ item.detail }}{% include "prepkits/_source_refs.html" %}</li>{% endfor %}</ul></section>
+  <section class="card"><h2>Story map</h2><ul>{% for item in prepkit.story_map %}<li>{{ item.title }} — {{ item.detail }}{% include "prepkits/_source_refs.html" %}</li>{% endfor %}</ul></section>
+  <section class="card"><h2>Question bank</h2><ol>{% for item in prepkit.question_bank %}<li>{{ item.question }}{% include "prepkits/_source_refs.html" %}</li>{% endfor %}</ol></section>
+  <section class="card"><h2>Concern map</h2><ul>{% for item in prepkit.concern_map %}<li>{{ item.concern }} — {{ item.detail }}{% include "prepkits/_source_refs.html" %}</li>{% endfor %}</ul></section>
+  <section class="card"><h2>Missing evidence</h2><ul>{% for item in prepkit.missing_evidence %}<li>{{ item.suggested_detail }}{% include "prepkits/_source_refs.html" %}</li>{% endfor %}</ul></section>
+  <section class="card"><h2>Practice priorities</h2><ol>{% for item in prepkit.practice_priorities %}<li>{{ item.detail }}{% include "prepkits/_source_refs.html" %}</li>{% endfor %}</ol></section>
+  <section class="card"><h2>Seven-day plan draft</h2><ol>{% for day in prepkit.seven_day_plan %}<li>Day {{ day.day_number }}: {{ day.focus }}{% for item in day.tasks %}{% include "prepkits/_source_refs.html" %}{% endfor %}</li>{% endfor %}</ol></section>
+  <section class="card"><h2>Interview checklist</h2><ul>{% for item in prepkit.interview_checklist %}<li>{{ item.detail }}{% include "prepkits/_source_refs.html" %}</li>{% endfor %}</ul></section>
+{% endblock %}
