@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Checkout · Evidra{% endblock %}
+{% block content %}
+  <section class="card">
+    <p class="eyebrow">Secure checkout</p>
+    <h1>Interview Sprint Prep Kit payment</h1>
+    <p>This is a one-time payment for this Interview Sprint. Browser redirects do not unlock paid access; only a verified Razorpay webhook can mark the Sprint paid.</p>
+    {% if provider_order_id %}
+      <p><strong>Razorpay order:</strong> {{ provider_order_id }}</p>
+      <p><strong>Amount:</strong> {{ amount }} {{ currency }}</p>
+      <div id="razorpay-checkout-config" data-key-id="{{ razorpay_key_id }}" data-order-id="{{ provider_order_id }}" data-amount="{{ amount }}" data-currency="{{ currency }}" data-name="{{ product_name }}"></div>
+      <button type="button" id="razorpay-checkout-button">Open Razorpay Checkout</button>
+      <p class="helptext">Use the checkout button to pay securely with Razorpay. Automated tests mock the payment provider.</p>
+      <p><a href="{% url 'payments:status' %}">View payment status</a></p>
+      <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+      <script>
+        (function () {
+          const config = document.getElementById("razorpay-checkout-config");
+          const button = document.getElementById("razorpay-checkout-button");
+          if (!config || !button || !window.Razorpay) { return; }
+          button.addEventListener("click", function () {
+            const checkout = new window.Razorpay({
+              key: config.dataset.keyId,
+              amount: config.dataset.amount,
+              currency: config.dataset.currency,
+              name: "Evidra",
+              description: config.dataset.name,
+              order_id: config.dataset.orderId,
+              callback_url: "{% url 'payments:status' %}",
+            });
+            checkout.open();
+          });
+        }());
+      </script>
+    {% elif payment and payment.provider_order_id %}
+      <p>An order already exists.</p>
+      <p><a href="{% url 'payments:status' %}">View payment status</a></p>
+    {% else %}
+      <form method="post" action="{% url 'payments:checkout' %}">
+        {% csrf_token %}
+        <button type="submit">Create Razorpay order</button>
+      </form>
+    {% endif %}
+  </section>
+{% endblock %}

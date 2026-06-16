@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.http import Http404
 
@@ -350,3 +351,89 @@ class SprintWorkflowService:
             locked_sprint.state = SprintState.PREVIEW_READY
             locked_sprint.save(update_fields=["state", "updated_at"])
             return locked_sprint
+
+    @staticmethod
+    def mark_payment_pending(*, user, sprint: InterviewSprint, payment) -> InterviewSprint:
+        from apps.payments.models import Payment, PaymentStatus
+
+        if (
+            not user.is_authenticated
+            or sprint.user_id != user.id
+            or payment.user_id != user.id
+            or payment.sprint_id != sprint.id
+            or payment.sprint.user_id != user.id
+        ):
+            raise SprintOwnershipError("Sprint or payment is not owned by this user.")
+        if payment.provider != Payment.PROVIDER_RAZORPAY:
+            raise SprintTransitionConditionMissing("A Razorpay payment is required.")
+        if not payment.provider_order_id:
+            raise SprintTransitionConditionMissing(
+                "A Razorpay order is required before payment pending."
+            )
+        if payment.status not in {PaymentStatus.ORDER_CREATED, PaymentStatus.PAYMENT_PENDING}:
+            raise SprintTransitionConditionMissing("An active payment order is required.")
+        SprintWorkflowService._validate_expected_payment_terms(payment=payment)
+
+        with transaction.atomic():
+            locked_sprint = InterviewSprint.objects.select_for_update().get(pk=sprint.pk, user=user)
+            current_state = SprintState(locked_sprint.state)
+            if current_state == SprintState.PAYMENT_PENDING:
+                return locked_sprint
+            if current_state != SprintState.PREVIEW_READY:
+                raise InvalidSprintTransition(
+                    f"Cannot mark payment pending while Sprint is in {current_state}."
+                )
+            locked_sprint.state = SprintState.PAYMENT_PENDING
+            locked_sprint.save(update_fields=["state", "updated_at"])
+            return locked_sprint
+
+    @staticmethod
+    def mark_paid(*, user, sprint: InterviewSprint, payment) -> InterviewSprint:
+        from apps.payments.models import Payment, PaymentStatus
+
+        if (
+            not user.is_authenticated
+            or sprint.user_id != user.id
+            or payment.user_id != user.id
+            or payment.sprint_id != sprint.id
+            or payment.sprint.user_id != user.id
+        ):
+            raise SprintOwnershipError("Sprint or payment is not owned by this user.")
+        if payment.provider != Payment.PROVIDER_RAZORPAY:
+            raise SprintTransitionConditionMissing("A Razorpay payment is required.")
+        if (
+            payment.status != PaymentStatus.PAID
+            or not payment.provider_order_id
+            or not payment.provider_payment_id
+            or payment.paid_at is None
+        ):
+            raise SprintTransitionConditionMissing("A verified paid payment is required.")
+        SprintWorkflowService._validate_expected_payment_terms(payment=payment)
+
+        with transaction.atomic():
+            locked_sprint = InterviewSprint.objects.select_for_update().get(pk=sprint.pk, user=user)
+            current_state = SprintState(locked_sprint.state)
+            if current_state == SprintState.PAID:
+                return locked_sprint
+            if current_state != SprintState.PAYMENT_PENDING:
+                raise InvalidSprintTransition(
+                    f"Cannot mark paid while Sprint is in {current_state}."
+                )
+            locked_sprint.state = SprintState.PAID
+            locked_sprint.save(update_fields=["state", "updated_at"])
+            return locked_sprint
+
+    @staticmethod
+    def _validate_expected_payment_terms(*, payment) -> None:
+        expected_amount = int(getattr(settings, "INTERVIEW_SPRINT_PRICE_AMOUNT", 0) or 0)
+        expected_currency = (
+            getattr(settings, "INTERVIEW_SPRINT_PRICE_CURRENCY", "") or ""
+        ).upper()
+        if expected_amount <= 0 or len(expected_currency) != 3:
+            raise SprintTransitionConditionMissing(
+                "Expected payment amount and currency are required."
+            )
+        if payment.amount != expected_amount or payment.currency.upper() != expected_currency:
+            raise SprintTransitionConditionMissing(
+                "Payment amount and currency must match the Interview Sprint price."
+            )

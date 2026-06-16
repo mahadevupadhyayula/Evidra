@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Payment status · Evidra{% endblock %}
+{% block content %}
+  {% include "payments/_status_card.html" %}
+  <section class="card">
+    <p><a href="{% url 'previews:detail' %}">Back to readiness preview</a></p>
+  </section>
+{% endblock %}

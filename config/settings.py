@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     "apps.stories",
     "apps.matching",
     "apps.previews",
+    "apps.payments",
     "apps.sprints",
     "apps.workspace",
 ]
@@ -129,6 +130,13 @@ PRIVATE_MEDIA_ROOT = Path(
 RESUME_MAX_UPLOAD_BYTES = int(os.getenv("EVIDRA_RESUME_MAX_UPLOAD_BYTES", str(5 * 1024 * 1024)))
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 EVIDRA_OPENAI_MODEL = os.getenv("EVIDRA_OPENAI_MODEL", "gpt-4o-mini")
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
+RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
+INTERVIEW_SPRINT_PRICE_AMOUNT = int(
+    os.getenv("INTERVIEW_SPRINT_PRICE_AMOUNT", "499900" if DEBUG else "0")
+)
+INTERVIEW_SPRINT_PRICE_CURRENCY = os.getenv("INTERVIEW_SPRINT_PRICE_CURRENCY", "INR")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_URL = "accounts:login"
