@@ -28,6 +28,18 @@
       {% elif sprint.state == "STORIES_READY" %}
         <p>Your reusable story bank is ready.</p>
         <p><a class="button-link" href="{% url 'stories:story_bank' %}">Review story bank</a></p>
+      {% elif sprint.state == "MATCHING_READY" or sprint.state == "PREVIEW_READY" %}
+        <p>Your readiness preview is ready or in progress.</p>
+        <p><a class="button-link" href="{% url 'previews:detail' %}">Review readiness preview</a></p>
+      {% elif sprint.state == "PAYMENT_PENDING" or sprint.state == "PAID" %}
+        <p>Your payment and Prep Kit are in progress.</p>
+        <p><a class="button-link" href="{% url 'prepkits:detail' %}">Open Prep Kit</a></p>
+      {% elif sprint.state == "PREPKIT_READY" %}
+        <p>Your Prep Kit is ready. Complete text practice next.</p>
+        <p><a class="button-link" href="{% url 'practice:index' %}">Practice answers</a></p>
+      {% elif sprint.state == "PRACTICE_ACTIVE" or sprint.state == "PLAN_READY" %}
+        <p>Your practice is active. Generate or follow your seven-day plan next.</p>
+        <p><a class="button-link" href="{% url 'plans:detail' %}">Open seven-day plan</a></p>
       {% endif %}
       <dl class="summary-list">
         <dt>Sprint ID</dt>
