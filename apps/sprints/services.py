@@ -488,6 +488,69 @@ class SprintWorkflowService:
             return locked_sprint
 
     @staticmethod
+    def mark_plan_ready(*, user, sprint: InterviewSprint, plan) -> InterviewSprint:
+        if (
+            not user.is_authenticated
+            or sprint.user_id != user.id
+            or plan.sprint_id != sprint.id
+            or plan.sprint.user_id != user.id
+        ):
+            raise SprintOwnershipError("Sprint or improvement plan is not owned by this user.")
+        from apps.plans.models import ImprovementPlanStatus, PlanTask
+        from apps.plans.services import ImprovementPlanService
+
+        if plan.status != ImprovementPlanStatus.ACTIVE:
+            raise SprintTransitionConditionMissing("An active improvement plan is required.")
+        if not PlanTask.objects.filter(plan=plan, plan__sprint__user=user).exists():
+            raise SprintTransitionConditionMissing("A plan must include at least one task.")
+        current_revision = ImprovementPlanService.current_input_revision(user=user, sprint=sprint)
+        if plan.generated_from_revision != current_revision:
+            raise SprintTransitionConditionMissing("A current improvement plan is required.")
+
+        with transaction.atomic():
+            locked_sprint = InterviewSprint.objects.select_for_update().get(pk=sprint.pk, user=user)
+            current_state = SprintState(locked_sprint.state)
+            if current_state == SprintState.PLAN_READY:
+                return locked_sprint
+            if current_state != SprintState.PRACTICE_ACTIVE:
+                raise InvalidSprintTransition(
+                    f"Cannot mark plan ready while Sprint is in {current_state}."
+                )
+            locked_sprint.state = SprintState.PLAN_READY
+            locked_sprint.save(update_fields=["state", "updated_at"])
+            return locked_sprint
+
+    @staticmethod
+    def mark_completed(*, user, sprint: InterviewSprint, plan) -> InterviewSprint:
+        if (
+            not user.is_authenticated
+            or sprint.user_id != user.id
+            or plan.sprint_id != sprint.id
+            or plan.sprint.user_id != user.id
+        ):
+            raise SprintOwnershipError("Sprint or improvement plan is not owned by this user.")
+        from apps.plans.models import ImprovementPlanStatus
+
+        if plan.status != ImprovementPlanStatus.COMPLETED:
+            raise SprintTransitionConditionMissing("A completed improvement plan is required.")
+
+        with transaction.atomic():
+            locked_sprint = InterviewSprint.objects.select_for_update().get(pk=sprint.pk, user=user)
+            current_state = SprintState(locked_sprint.state)
+            if current_state == SprintState.COMPLETED:
+                return locked_sprint
+            if current_state != SprintState.PLAN_READY:
+                raise InvalidSprintTransition(
+                    f"Cannot complete Sprint while Sprint is in {current_state}."
+                )
+            from django.utils import timezone
+
+            locked_sprint.state = SprintState.COMPLETED
+            locked_sprint.completed_at = timezone.now()
+            locked_sprint.save(update_fields=["state", "completed_at", "updated_at"])
+            return locked_sprint
+
+    @staticmethod
     def _validate_expected_payment_terms(*, payment) -> None:
         expected_amount = int(getattr(settings, "INTERVIEW_SPRINT_PRICE_AMOUNT", 0) or 0)
         expected_currency = (getattr(settings, "INTERVIEW_SPRINT_PRICE_CURRENCY", "") or "").upper()
