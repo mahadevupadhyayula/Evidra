@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from apps.sprints.services import SprintWorkflowService
-from apps.workspace.presentation import build_workflow_steps
+from apps.workspace.presentation import build_next_step, build_workflow_steps
 
 
 @login_required
@@ -18,10 +18,11 @@ def index(request):
         sprint.state if sprint else None,
         url_resolver=reverse,
     )
+    next_step = build_next_step(request.user, sprint, url_resolver=reverse)
     return render(
         request,
         "workspace/index.html",
-        {"sprint": sprint, "workflow_steps": workflow_steps},
+        {"sprint": sprint, "workflow_steps": workflow_steps, "next_step": next_step},
     )
 
 

@@ -13,10 +13,6 @@
           <h1 id="workspace-title">Your Interview Sprint</h1>
           <p>Turn your career evidence into interview readiness.</p>
         </div>
-        <form method="post" action="{% url 'workspace:current_sprint' %}">
-          {% csrf_token %}
-          <button type="submit">{% if sprint %}Resume Sprint{% else %}New Opportunity{% endif %}</button>
-        </form>
       </header>
 
       <section class="workspace-progress" aria-label="Sprint progress">
@@ -37,51 +33,18 @@
 
       <div class="workspace-grid">
         <section class="workspace-panel workspace-panel-primary">
-          {% if sprint %}
-            <h2>Next best step</h2>
-            {% if sprint.state == "DRAFT" %}
-              <p>Next step: add and confirm your resume.</p>
-              <p><a class="button-link" href="{% url 'documents:resume_upload' %}">Add resume</a></p>
-            {% elif sprint.state == "RESUME_READY" %}
-              <p>Your resume is confirmed. Review and confirm your career profile next.</p>
-              <p><a class="button-link" href="{% url 'profiles:profile_review' %}">Review profile</a></p>
-              <form method="post" action="{% url 'documents:resume_replace' %}">
-                {% csrf_token %}
-                <button type="submit">Replace resume</button>
-              </form>
-            {% elif sprint.state == "PROFILE_CONFIRMED" %}
-              <p>Your career profile is confirmed. Add opportunity context next.</p>
-              <p><a class="button-link" href="{% url 'opportunities:opportunity_detail' %}">Add opportunity context</a></p>
-            {% elif sprint.state == "OPPORTUNITY_CONFIRMED" or sprint.state == "EVIDENCE_REVIEW" %}
-              <p>Your opportunity is confirmed. Review and approve career evidence next.</p>
-              <p><a class="button-link" href="{% url 'evidence:evidence_review' %}">Review evidence</a></p>
-            {% elif sprint.state == "EVIDENCE_APPROVED" %}
-              <p>Your evidence is approved. Generate reusable interview stories next.</p>
-              <p><a class="button-link" href="{% url 'stories:story_bank' %}">Generate reusable stories</a></p>
-            {% elif sprint.state == "STORIES_READY" %}
-              <p>Your reusable story bank is ready.</p>
-              <p><a class="button-link" href="{% url 'stories:story_bank' %}">Review story bank</a></p>
-            {% elif sprint.state == "MATCHING_READY" or sprint.state == "PREVIEW_READY" %}
-              <p>Your readiness preview is ready or in progress.</p>
-              <p><a class="button-link" href="{% url 'previews:detail' %}">Review readiness preview</a></p>
-            {% elif sprint.state == "PAYMENT_PENDING" or sprint.state == "PAID" %}
-              <p>Your payment and Prep Kit are in progress.</p>
-              <p><a class="button-link" href="{% url 'prepkits:detail' %}">Open Prep Kit</a></p>
-            {% elif sprint.state == "PREPKIT_READY" %}
-              <p>Your Prep Kit is ready. Complete text practice next.</p>
-              <p><a class="button-link" href="{% url 'practice:index' %}">Practice answers</a></p>
-            {% elif sprint.state == "PRACTICE_ACTIVE" or sprint.state == "PLAN_READY" %}
-              <p>Your practice is active. Generate or follow your seven-day plan next.</p>
-              <p><a class="button-link" href="{% url 'plans:detail' %}">Open seven-day plan</a></p>
-            {% endif %}
-          {% else %}
-            <h2>Start your Sprint</h2>
-            <p>Create a Draft Interview Sprint to start the MBP workflow foundation.</p>
-            <form method="post" action="{% url 'workspace:current_sprint' %}">
+          <p class="eyebrow">{{ next_step.eyebrow }}</p>
+          <h2>{{ next_step.title }}</h2>
+          <p>{{ next_step.body }}</p>
+          {% if next_step.cta_method == "post" %}
+            <form method="post" action="{{ next_step.cta_url }}">
               {% csrf_token %}
-              <button type="submit">Create Interview Sprint</button>
+              <button type="submit">{{ next_step.cta_label }}</button>
             </form>
+          {% else %}
+            <p><a class="button-link" href="{{ next_step.cta_url }}">{{ next_step.cta_label }}</a></p>
           {% endif %}
+          <p>{{ next_step.reassurance }}</p>
         </section>
 
         <section class="workspace-panel">
