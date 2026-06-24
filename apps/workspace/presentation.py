@@ -145,6 +145,32 @@ def build_workflow_steps(
     return steps
 
 
+def build_opportunity_action(
+    *,
+    sprint,
+    opportunity_summary: dict[str, object] | None,
+    next_step: dict[str, str],
+    url_resolver: Callable[[str], str],
+) -> dict[str, str] | None:
+    """Build a safe opportunity CTA without starting or replacing Sprints."""
+
+    if sprint is None or opportunity_summary is None:
+        return None
+
+    if sprint.state == SprintState.PROFILE_CONFIRMED:
+        return {
+            "label": "Edit Opportunity",
+            "url": url_resolver("opportunities:opportunity_detail"),
+            "help_text": "Update the current Sprint opportunity before confirming it.",
+        }
+
+    return {
+        "label": "Resume Sprint",
+        "url": next_step["cta_url"],
+        "help_text": "Continue the current Sprint instead of creating another active opportunity.",
+    }
+
+
 def build_recent_activity(
     *, user, sprint, url_resolver: Callable[[str], str], limit: int = 5
 ) -> list[dict[str, object]]:

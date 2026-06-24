@@ -12,6 +12,7 @@ from apps.stories.models import Story, StoryStatus
 from apps.workspace.presentation import (
     build_current_opportunity_summary,
     build_next_step,
+    build_opportunity_action,
     build_recent_activity,
     build_sidebar_payment_status,
     build_sidebar_user,
@@ -84,6 +85,12 @@ def index(request):
         sprint=sprint,
         next_step=next_step,
     )
+    opportunity_action = build_opportunity_action(
+        sprint=sprint,
+        opportunity_summary=opportunity_summary,
+        next_step=next_step,
+        url_resolver=reverse,
+    )
     recent_activity = build_recent_activity(
         user=request.user,
         sprint=sprint,
@@ -103,6 +110,7 @@ def index(request):
             "next_step": next_step,
             "dashboard_metrics": dashboard_metrics,
             "opportunity_summary": opportunity_summary,
+            "opportunity_action": opportunity_action,
             "recent_activity": recent_activity,
             "sidebar_user": sidebar_user,
             "sidebar_payment_status": sidebar_payment_status,
