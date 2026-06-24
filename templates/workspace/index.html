@@ -1,62 +1,101 @@
 {% extends "base.html" %}
 {% block title %}Workspace · Evidra{% endblock %}
 {% block content %}
-  <section class="card">
-    <p class="eyebrow">Workspace</p>
-    <h1>Your Interview Sprint</h1>
-    {% if sprint %}
-      <p>Your current Sprint is ready to resume.</p>
-      {% if sprint.state == "DRAFT" %}
-        <p>Next step: add and confirm your resume.</p>
-        <p><a class="button-link" href="{% url 'documents:resume_upload' %}">Add resume</a></p>
-      {% elif sprint.state == "RESUME_READY" %}
-        <p>Your resume is confirmed. Review and confirm your career profile next.</p>
-        <p><a class="button-link" href="{% url 'profiles:profile_review' %}">Review profile</a></p>
-        <form method="post" action="{% url 'documents:resume_replace' %}">
-          {% csrf_token %}
-          <button type="submit">Replace resume</button>
-        </form>
-      {% elif sprint.state == "PROFILE_CONFIRMED" %}
-        <p>Your career profile is confirmed. Add opportunity context next.</p>
-        <p><a class="button-link" href="{% url 'opportunities:opportunity_detail' %}">Add opportunity context</a></p>
-      {% elif sprint.state == "OPPORTUNITY_CONFIRMED" or sprint.state == "EVIDENCE_REVIEW" %}
-        <p>Your opportunity is confirmed. Review and approve career evidence next.</p>
-        <p><a class="button-link" href="{% url 'evidence:evidence_review' %}">Review evidence</a></p>
-      {% elif sprint.state == "EVIDENCE_APPROVED" %}
-        <p>Your evidence is approved. Generate reusable interview stories next.</p>
-        <p><a class="button-link" href="{% url 'stories:story_bank' %}">Generate reusable stories</a></p>
-      {% elif sprint.state == "STORIES_READY" %}
-        <p>Your reusable story bank is ready.</p>
-        <p><a class="button-link" href="{% url 'stories:story_bank' %}">Review story bank</a></p>
-      {% elif sprint.state == "MATCHING_READY" or sprint.state == "PREVIEW_READY" %}
-        <p>Your readiness preview is ready or in progress.</p>
-        <p><a class="button-link" href="{% url 'previews:detail' %}">Review readiness preview</a></p>
-      {% elif sprint.state == "PAYMENT_PENDING" or sprint.state == "PAID" %}
-        <p>Your payment and Prep Kit are in progress.</p>
-        <p><a class="button-link" href="{% url 'prepkits:detail' %}">Open Prep Kit</a></p>
-      {% elif sprint.state == "PREPKIT_READY" %}
-        <p>Your Prep Kit is ready. Complete text practice next.</p>
-        <p><a class="button-link" href="{% url 'practice:index' %}">Practice answers</a></p>
-      {% elif sprint.state == "PRACTICE_ACTIVE" or sprint.state == "PLAN_READY" %}
-        <p>Your practice is active. Generate or follow your seven-day plan next.</p>
-        <p><a class="button-link" href="{% url 'plans:detail' %}">Open seven-day plan</a></p>
-      {% endif %}
+  <section class="workspace-shell" aria-labelledby="workspace-title">
+    <aside class="workspace-sidebar" aria-label="Sprint overview">
+      <p class="eyebrow">Workspace</p>
+      <h2>Interview readiness</h2>
+      <p>Follow the approved Sprint path from source evidence to practice plan.</p>
       <dl class="summary-list">
-        <dt>Sprint ID</dt>
-        <dd>{{ sprint.id }}</dd>
-        <dt>State</dt>
-        <dd><strong>{{ sprint.state }}</strong></dd>
+        <dt>Status</dt>
+        <dd>{% if sprint %}{{ sprint.state }}{% else %}Not started{% endif %}</dd>
+        {% if sprint %}
+          <dt>Sprint ID</dt>
+          <dd>{{ sprint.id }}</dd>
+        {% endif %}
       </dl>
-      <form method="post" action="{% url 'workspace:current_sprint' %}">
-        {% csrf_token %}
-        <button type="submit">Resume Sprint</button>
-      </form>
-    {% else %}
-      <p>Create a Draft Interview Sprint to start the MBP workflow foundation.</p>
-      <form method="post" action="{% url 'workspace:current_sprint' %}">
-        {% csrf_token %}
-        <button type="submit">Create Interview Sprint</button>
-      </form>
-    {% endif %}
+    </aside>
+
+    <main class="workspace-main">
+      <header class="workspace-header">
+        <div>
+          <p class="eyebrow">Current Sprint</p>
+          <h1 id="workspace-title">Your Interview Sprint</h1>
+          <p>Turn your career evidence into interview readiness.</p>
+        </div>
+        <form method="post" action="{% url 'workspace:current_sprint' %}">
+          {% csrf_token %}
+          <button type="submit">{% if sprint %}Resume Sprint{% else %}New Opportunity{% endif %}</button>
+        </form>
+      </header>
+
+      <section class="workspace-progress" aria-label="Sprint progress">
+        <span class="workspace-progress-step{% if sprint %} is-active{% endif %}">Resume</span>
+        <span class="workspace-progress-step{% if sprint.state == 'RESUME_READY' or sprint.state == 'PROFILE_CONFIRMED' or sprint.state == 'OPPORTUNITY_CONFIRMED' or sprint.state == 'EVIDENCE_REVIEW' or sprint.state == 'EVIDENCE_APPROVED' or sprint.state == 'STORIES_READY' or sprint.state == 'MATCHING_READY' or sprint.state == 'PREVIEW_READY' or sprint.state == 'PAYMENT_PENDING' or sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' %} is-active{% endif %}">Profile</span>
+        <span class="workspace-progress-step{% if sprint.state == 'OPPORTUNITY_CONFIRMED' or sprint.state == 'EVIDENCE_REVIEW' or sprint.state == 'EVIDENCE_APPROVED' or sprint.state == 'STORIES_READY' or sprint.state == 'MATCHING_READY' or sprint.state == 'PREVIEW_READY' or sprint.state == 'PAYMENT_PENDING' or sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' %} is-active{% endif %}">Opportunity</span>
+        <span class="workspace-progress-step{% if sprint.state == 'EVIDENCE_APPROVED' or sprint.state == 'STORIES_READY' or sprint.state == 'MATCHING_READY' or sprint.state == 'PREVIEW_READY' or sprint.state == 'PAYMENT_PENDING' or sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' %} is-active{% endif %}">Evidence</span>
+        <span class="workspace-progress-step{% if sprint.state == 'STORIES_READY' or sprint.state == 'MATCHING_READY' or sprint.state == 'PREVIEW_READY' or sprint.state == 'PAYMENT_PENDING' or sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' %} is-active{% endif %}">Stories</span>
+        <span class="workspace-progress-step{% if sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' %} is-active{% endif %}">Prep</span>
+      </section>
+
+      <div class="workspace-grid">
+        <section class="workspace-panel workspace-panel-primary">
+          {% if sprint %}
+            <h2>Next best step</h2>
+            {% if sprint.state == "DRAFT" %}
+              <p>Next step: add and confirm your resume.</p>
+              <p><a class="button-link" href="{% url 'documents:resume_upload' %}">Add resume</a></p>
+            {% elif sprint.state == "RESUME_READY" %}
+              <p>Your resume is confirmed. Review and confirm your career profile next.</p>
+              <p><a class="button-link" href="{% url 'profiles:profile_review' %}">Review profile</a></p>
+              <form method="post" action="{% url 'documents:resume_replace' %}">
+                {% csrf_token %}
+                <button type="submit">Replace resume</button>
+              </form>
+            {% elif sprint.state == "PROFILE_CONFIRMED" %}
+              <p>Your career profile is confirmed. Add opportunity context next.</p>
+              <p><a class="button-link" href="{% url 'opportunities:opportunity_detail' %}">Add opportunity context</a></p>
+            {% elif sprint.state == "OPPORTUNITY_CONFIRMED" or sprint.state == "EVIDENCE_REVIEW" %}
+              <p>Your opportunity is confirmed. Review and approve career evidence next.</p>
+              <p><a class="button-link" href="{% url 'evidence:evidence_review' %}">Review evidence</a></p>
+            {% elif sprint.state == "EVIDENCE_APPROVED" %}
+              <p>Your evidence is approved. Generate reusable interview stories next.</p>
+              <p><a class="button-link" href="{% url 'stories:story_bank' %}">Generate reusable stories</a></p>
+            {% elif sprint.state == "STORIES_READY" %}
+              <p>Your reusable story bank is ready.</p>
+              <p><a class="button-link" href="{% url 'stories:story_bank' %}">Review story bank</a></p>
+            {% elif sprint.state == "MATCHING_READY" or sprint.state == "PREVIEW_READY" %}
+              <p>Your readiness preview is ready or in progress.</p>
+              <p><a class="button-link" href="{% url 'previews:detail' %}">Review readiness preview</a></p>
+            {% elif sprint.state == "PAYMENT_PENDING" or sprint.state == "PAID" %}
+              <p>Your payment and Prep Kit are in progress.</p>
+              <p><a class="button-link" href="{% url 'prepkits:detail' %}">Open Prep Kit</a></p>
+            {% elif sprint.state == "PREPKIT_READY" %}
+              <p>Your Prep Kit is ready. Complete text practice next.</p>
+              <p><a class="button-link" href="{% url 'practice:index' %}">Practice answers</a></p>
+            {% elif sprint.state == "PRACTICE_ACTIVE" or sprint.state == "PLAN_READY" %}
+              <p>Your practice is active. Generate or follow your seven-day plan next.</p>
+              <p><a class="button-link" href="{% url 'plans:detail' %}">Open seven-day plan</a></p>
+            {% endif %}
+          {% else %}
+            <h2>Start your Sprint</h2>
+            <p>Create a Draft Interview Sprint to start the MBP workflow foundation.</p>
+            <form method="post" action="{% url 'workspace:current_sprint' %}">
+              {% csrf_token %}
+              <button type="submit">Create Interview Sprint</button>
+            </form>
+          {% endif %}
+        </section>
+
+        <section class="workspace-panel">
+          <h2>How Evidra protects readiness</h2>
+          <ul>
+            <li>Career claims stay grounded in approved evidence.</li>
+            <li>Workflow changes remain server-side POST actions.</li>
+            <li>One current Sprint keeps focus on the active opportunity.</li>
+          </ul>
+        </section>
+      </div>
+    </main>
   </section>
 {% endblock %}
