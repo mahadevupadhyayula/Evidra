@@ -19,6 +19,13 @@ def test_signup_view_creates_user_and_logs_in(client):
     assert get_user_model().objects.filter(email="new@example.com").exists()
 
 
+def test_signup_view_links_to_login(client):
+    response = client.get(reverse("accounts:signup"))
+
+    assert response.status_code == 200
+    assert f'href="{reverse("accounts:login")}"' in response.content.decode()
+
+
 @pytest.mark.django_db
 def test_authenticated_user_is_redirected_from_signup(client):
     user = get_user_model().objects.create_user(
@@ -32,6 +39,13 @@ def test_authenticated_user_is_redirected_from_signup(client):
 
     assert response.status_code == 302
     assert response.url == reverse("workspace:index")
+
+
+def test_login_view_links_to_signup(client):
+    response = client.get(reverse("accounts:login"))
+
+    assert response.status_code == 200
+    assert f'href="{reverse("accounts:signup")}"' in response.content.decode()
 
 
 @pytest.mark.django_db

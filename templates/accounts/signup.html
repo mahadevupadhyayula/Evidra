@@ -30,6 +30,10 @@
     </aside>
     <div class="auth-panel">
       <div class="auth-card">
+        <nav class="auth-tabs" aria-label="Authentication">
+          <button type="button" class="active" aria-current="page" disabled>Sign Up</button>
+          <a href="{% url 'accounts:login' %}">Log In</a>
+        </nav>
         <p class="eyebrow">Get started</p>
         <h1>Create your account</h1>
         <form method="post" novalidate>
