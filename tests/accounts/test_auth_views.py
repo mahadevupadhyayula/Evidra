@@ -49,6 +49,15 @@ def test_signup_view_creates_user_and_logs_in(client):
     assert user.first_name == "New User"
 
 
+def test_signup_view_omits_terms_privacy_links_without_approved_legal_pages(client):
+    response = client.get(reverse("accounts:signup"))
+
+    html = response.content.decode().lower()
+    assert response.status_code == 200
+    assert "terms" not in html
+    assert "privacy" not in html
+
+
 def test_signup_view_links_to_login(client):
     response = client.get(reverse("accounts:signup"))
 

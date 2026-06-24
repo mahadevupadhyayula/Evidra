@@ -5,10 +5,11 @@ from apps.accounts.forms import EmailSignupForm
 
 
 @pytest.mark.django_db
-def test_signup_form_field_order_matches_mockup():
+def test_signup_form_omits_terms_checkbox_without_approved_legal_pages():
     form = EmailSignupForm()
 
     assert list(form.fields) == ["full_name", "email", "password1", "password2"]
+    assert "accept_terms" not in form.fields
 
 
 @pytest.mark.django_db
