@@ -49,10 +49,7 @@ def test_workspace_only_displays_authenticated_users_sprint(client):
 
     assert response.status_code == 200
     assert b"Sprint ID" not in response.content
-    assert (
-        f"Sprint ID</dt>\n    <dd>{other_sprint.pk}</dd>".encode()
-        not in response.content
-    )
+    assert f"Sprint ID</dt>\n    <dd>{other_sprint.pk}</dd>".encode() not in response.content
 
 
 @pytest.mark.django_db
@@ -87,9 +84,7 @@ def test_workspace_only_displays_authenticated_users_sprint(client):
         (SprintState.PLAN_READY, "Open seven-day plan", "plans:detail"),
     ],
 )
-def test_workspace_next_step_uses_link_for_navigation_ctas(
-    client, state, label, url_name
-):
+def test_workspace_next_step_uses_link_for_navigation_ctas(client, state, label, url_name):
     user = get_user_model().objects.create_user(username=f"{state}@example.com")
     InterviewSprint.objects.create(user=user, state=state)
     client.force_login(user)
@@ -99,10 +94,120 @@ def test_workspace_next_step_uses_link_for_navigation_ctas(
     assert response.status_code == 200
     expected_link = f'<a class="button-link" href="{reverse(url_name)}">{label}</a>'
     assert expected_link.encode() in response.content
-    assert (
-        b'<form method="post" action="/workspace/sprints/current/">'
-        not in response.content
-    )
+    assert b'<form method="post" action="/workspace/sprints/current/">' not in response.content
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("state", "expected_statuses"),
+    [
+        (None, ["locked"] * 10),
+        (
+            SprintState.DRAFT,
+            [
+                "current",
+                "locked",
+                "locked",
+                "locked",
+                "locked",
+                "locked",
+                "locked",
+                "locked",
+                "locked",
+                "locked",
+            ],
+        ),
+        (
+            SprintState.EVIDENCE_APPROVED,
+            [
+                "complete",
+                "complete",
+                "complete",
+                "complete",
+                "current",
+                "locked",
+                "locked",
+                "locked",
+                "locked",
+                "locked",
+            ],
+        ),
+        (
+            SprintState.STORIES_READY,
+            [
+                "complete",
+                "complete",
+                "complete",
+                "complete",
+                "complete",
+                "current",
+                "locked",
+                "locked",
+                "locked",
+                "locked",
+            ],
+        ),
+        (
+            SprintState.PREPKIT_READY,
+            [
+                "complete",
+                "complete",
+                "complete",
+                "complete",
+                "complete",
+                "complete",
+                "complete",
+                "complete",
+                "current",
+                "locked",
+            ],
+        ),
+        (
+            SprintState.PLAN_READY,
+            [
+                "complete",
+                "complete",
+                "complete",
+                "complete",
+                "complete",
+                "complete",
+                "complete",
+                "complete",
+                "complete",
+                "current",
+            ],
+        ),
+    ],
+)
+def test_workspace_visual_workflow_mapping_for_representative_states(
+    client, state, expected_statuses
+):
+    user = get_user_model().objects.create_user(username=f"workflow-{state or 'none'}@example.com")
+    if state is not None:
+        InterviewSprint.objects.create(user=user, state=state)
+    client.force_login(user)
+
+    response = client.get(reverse("workspace:index"))
+
+    assert response.status_code == 200
+    steps = response.context["workflow_steps"]
+    assert [step["label"] for step in steps] == [
+        "Resume",
+        "Profile",
+        "Opportunity",
+        "Evidence",
+        "Stories",
+        "Matching",
+        "Preview",
+        "Prep Kit",
+        "Practice",
+        "Plan",
+    ]
+    assert [step["status"] for step in steps] == expected_statuses
+    for step, expected_status in zip(steps, expected_statuses, strict=True):
+        assert f"workspace-progress-step is-{expected_status}".encode() in response.content
+        if expected_status == "current":
+            assert f"<span>{step['label']}</span>".encode() in response.content
 
 
 @pytest.mark.django_db
@@ -236,9 +341,7 @@ def test_workspace_dashboard_metrics_are_current_user_current_sprint_only(client
     assert metrics["approved_evidence_count"] == 1
     assert metrics["ready_story_count"] == 2
     assert metrics["readiness_score"] == 70
-    assert (
-        metrics["next_step_summary"]["title"] == response.context["next_step"]["title"]
-    )
+    assert metrics["next_step_summary"]["title"] == response.context["next_step"]["title"]
     assert b"+6 this week" not in response.content
 
 
@@ -380,6 +483,143 @@ def test_workspace_recent_activity_empty_state_without_activity(client):
     assert response.status_code == 200
     assert response.context["recent_activity"] == []
     assert b"Your recent Sprint updates will appear here." in response.content
+
+
+@pytest.mark.django_db
+def test_workspace_dashboard_metric_counts_exclude_other_user_same_state_records(client):
+    from apps.evidence.models import EvidenceCard, EvidenceStatus
+    from apps.stories.models import Story, StoryStatus
+    from tests.opportunities.helpers import make_profile_confirmed_sprint
+
+    user, sprint, profile = make_profile_confirmed_sprint("isolated-counts@example.com")
+    other_user, other_sprint, other_profile = make_profile_confirmed_sprint(
+        "isolated-counts-other@example.com"
+    )
+
+    EvidenceCard.objects.create(
+        user=user,
+        profile=profile,
+        source_document=sprint.active_resume,
+        title="Owned approved evidence",
+        source_excerpt="Owned excerpt",
+        status=EvidenceStatus.APPROVED,
+    )
+    for index in range(3):
+        EvidenceCard.objects.create(
+            user=other_user,
+            profile=other_profile,
+            source_document=other_sprint.active_resume,
+            title=f"Other approved evidence {index}",
+            source_excerpt="Other excerpt",
+            status=EvidenceStatus.APPROVED,
+        )
+        Story.objects.create(
+            user=other_user,
+            profile=other_profile,
+            title=f"Other ready story {index}",
+            short_answer="Short answer",
+            ninety_second_answer="Ninety second answer",
+            detailed_answer="Detailed answer",
+            status=StoryStatus.READY,
+        )
+
+    client.force_login(user)
+    response = client.get(reverse("workspace:index"))
+
+    assert response.status_code == 200
+    metrics = response.context["dashboard_metrics"]
+    assert metrics["approved_evidence_count"] == 1
+    assert metrics["ready_story_count"] == 0
+    assert b"<dt>Approved evidence</dt>\n            <dd>1</dd>" in response.content
+    assert b"<dt>Ready stories</dt>\n            <dd>0</dd>" in response.content
+
+
+@pytest.mark.django_db
+def test_workspace_current_opportunity_card_excludes_other_users_opportunity(client):
+    from apps.opportunities.models import Opportunity
+    from tests.opportunities.helpers import jd_analysis_dict, opportunity_data
+
+    User = get_user_model()
+    user = User.objects.create_user(username="no-owned-opportunity@example.com")
+    InterviewSprint.objects.create(user=user, state=SprintState.PROFILE_CONFIRMED)
+    other_user = User.objects.create_user(username="other-opportunity-card@example.com")
+    other_sprint = InterviewSprint.objects.create(
+        user=other_user, state=SprintState.PROFILE_CONFIRMED
+    )
+    Opportunity.objects.create(
+        sprint=other_sprint,
+        jd_analysis=jd_analysis_dict(),
+        **opportunity_data(
+            role_title="Other User Role",
+            company_name="Other User Company",
+        ),
+    )
+    client.force_login(user)
+
+    response = client.get(reverse("workspace:index"))
+
+    assert response.status_code == 200
+    assert response.context["opportunity_summary"] is None
+    assert b"Current opportunity" not in response.content
+    assert b"Other User Role" not in response.content
+    assert b"Other User Company" not in response.content
+
+
+@pytest.mark.django_db
+def test_workspace_empty_states_render_when_no_sprint_exists(client):
+    user = get_user_model().objects.create_user(username="empty-no-sprint@example.com")
+    client.force_login(user)
+
+    response = client.get(reverse("workspace:index"))
+
+    assert response.status_code == 200
+    assert response.context["sprint"] is None
+    assert response.context["recent_activity"] == []
+    assert b"Start your Interview Sprint" in response.content
+    assert b"Create Interview Sprint" in response.content
+    assert b"Your recent Sprint updates will appear here." in response.content
+    assert b"Not available yet" in response.content
+
+
+@pytest.mark.django_db
+def test_workspace_recent_activity_orders_newest_first_and_limits_to_five(client):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.evidence.models import EvidenceCard, EvidenceStatus
+    from tests.opportunities.helpers import make_profile_confirmed_sprint
+
+    user, sprint, profile = make_profile_confirmed_sprint("activity-order@example.com")
+    base_time = timezone.now()
+    for index in range(6):
+        card = EvidenceCard.objects.create(
+            user=user,
+            profile=profile,
+            source_document=sprint.active_resume,
+            title=f"Owned activity {index}",
+            source_excerpt="Owned excerpt",
+            status=EvidenceStatus.APPROVED,
+        )
+        EvidenceCard.objects.filter(pk=card.pk).update(
+            updated_at=base_time + timedelta(minutes=index)
+        )
+
+    client.force_login(user)
+    response = client.get(reverse("workspace:index"))
+
+    assert response.status_code == 200
+    activity = response.context["recent_activity"]
+    assert len(activity) == 5
+    assert [item["title"] for item in activity] == [
+        "Owned activity 5",
+        "Owned activity 4",
+        "Owned activity 3",
+        "Owned activity 2",
+        "Owned activity 1",
+    ]
+    assert b"Owned activity 5" in response.content
+    assert b"Owned activity 0" not in response.content
 
 
 @pytest.mark.django_db
