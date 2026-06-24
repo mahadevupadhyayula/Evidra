@@ -545,3 +545,100 @@ input {
     flex-direction: column;
   }
 }
+
+.workspace-shell {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: minmax(220px, 0.32fr) minmax(0, 1fr);
+}
+
+.workspace-sidebar,
+.workspace-header,
+.workspace-progress,
+.workspace-panel {
+  background: #fffaf2;
+  border: 1px solid #e7dac8;
+  border-radius: 1rem;
+  box-shadow: 0 18px 50px rgb(85 55 24 / 8%);
+  padding: 1.5rem;
+}
+
+.workspace-sidebar h2,
+.workspace-panel h2 {
+  margin-top: 0;
+}
+
+.workspace-main {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.workspace-header {
+  align-items: start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.workspace-header h1 {
+  margin: 0.25rem 0 0.5rem;
+}
+
+.workspace-header p:last-child,
+.workspace-sidebar p {
+  color: #5d554c;
+  margin-bottom: 0;
+}
+
+.workspace-progress {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.workspace-progress-step {
+  background: #f4eadc;
+  border-radius: 999px;
+  color: #6b6259;
+  font-size: 0.85rem;
+  font-weight: 800;
+  padding: 0.65rem 0.75rem;
+  text-align: center;
+}
+
+.workspace-progress-step.is-active {
+  background: #6c3c17;
+  color: #fffaf2;
+}
+
+.workspace-grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.65fr);
+}
+
+.workspace-panel-primary {
+  min-height: 14rem;
+}
+
+.workspace-panel ul {
+  color: #5d554c;
+  line-height: 1.6;
+  padding-left: 1.25rem;
+}
+
+@media (max-width: 820px) {
+  .workspace-shell,
+  .workspace-grid,
+  .workspace-header {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-header {
+    display: grid;
+  }
+
+  .workspace-progress {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
