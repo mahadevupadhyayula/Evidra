@@ -417,9 +417,18 @@ input {
 }
 
 .auth-field:has(input[type="password"])::before,
-.auth-card .field:has(input[type="password"])::before {
+.auth-card .field:has(input[type="password"])::before,
+.auth-card .field:has(.auth-password-input)::before {
   content: "●";
   font-size: 0.75rem;
+}
+
+.auth-password-input {
+  position: relative;
+}
+
+.auth-card .field .auth-password-input input {
+  padding-right: 4.6rem;
 }
 
 .auth-password-toggle {
