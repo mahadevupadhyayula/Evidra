@@ -5,65 +5,19 @@
 
 <nav class="workspace-nav" aria-label="Workspace navigation">
   <a class="is-active" aria-current="page" href="{% url 'workspace:index' %}">Workspace</a>
-  {% if sprint %}
-    <a href="{% url 'documents:resume_upload' %}">Resume</a>
-  {% else %}
-    <span class="is-disabled" aria-disabled="true">Resume</span>
-  {% endif %}
-
-  {% if sprint.state == 'RESUME_READY' or sprint.state == 'PROFILE_CONFIRMED' or sprint.state == 'OPPORTUNITY_CONFIRMED' or sprint.state == 'EVIDENCE_REVIEW' or sprint.state == 'EVIDENCE_APPROVED' or sprint.state == 'STORIES_READY' or sprint.state == 'MATCHING_READY' or sprint.state == 'PREVIEW_READY' or sprint.state == 'PAYMENT_PENDING' or sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' or sprint.state == 'COMPLETED' %}
-    <a href="{% url 'profiles:profile_review' %}">Profile</a>
-  {% else %}
-    <span class="is-disabled" aria-disabled="true">Profile</span>
-  {% endif %}
-
-  {% if sprint.state == 'PROFILE_CONFIRMED' or sprint.state == 'OPPORTUNITY_CONFIRMED' or sprint.state == 'EVIDENCE_REVIEW' or sprint.state == 'EVIDENCE_APPROVED' or sprint.state == 'STORIES_READY' or sprint.state == 'MATCHING_READY' or sprint.state == 'PREVIEW_READY' or sprint.state == 'PAYMENT_PENDING' or sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' or sprint.state == 'COMPLETED' %}
-    <a href="{% url 'opportunities:opportunity_detail' %}">Opportunity</a>
-  {% else %}
-    <span class="is-disabled" aria-disabled="true">Opportunity</span>
-  {% endif %}
-
-  {% if sprint.state == 'OPPORTUNITY_CONFIRMED' or sprint.state == 'EVIDENCE_REVIEW' or sprint.state == 'EVIDENCE_APPROVED' or sprint.state == 'STORIES_READY' or sprint.state == 'MATCHING_READY' or sprint.state == 'PREVIEW_READY' or sprint.state == 'PAYMENT_PENDING' or sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' or sprint.state == 'COMPLETED' %}
-    <a href="{% url 'evidence:evidence_review' %}">Evidence</a>
-  {% else %}
-    <span class="is-disabled" aria-disabled="true">Evidence</span>
-  {% endif %}
-
-  {% if sprint.state == 'EVIDENCE_APPROVED' or sprint.state == 'STORIES_READY' or sprint.state == 'MATCHING_READY' or sprint.state == 'PREVIEW_READY' or sprint.state == 'PAYMENT_PENDING' or sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' or sprint.state == 'COMPLETED' %}
-    <a href="{% url 'stories:story_bank' %}">Stories</a>
-  {% else %}
-    <span class="is-disabled" aria-disabled="true">Stories</span>
-  {% endif %}
-
-  {% if sprint.state == 'STORIES_READY' or sprint.state == 'MATCHING_READY' or sprint.state == 'PREVIEW_READY' or sprint.state == 'PAYMENT_PENDING' or sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' or sprint.state == 'COMPLETED' %}
-    <a href="{% url 'matching:index' %}">Matching</a>
-  {% else %}
-    <span class="is-disabled" aria-disabled="true">Matching</span>
-  {% endif %}
-
-  {% if sprint.state == 'MATCHING_READY' or sprint.state == 'PREVIEW_READY' or sprint.state == 'PAYMENT_PENDING' or sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' or sprint.state == 'COMPLETED' %}
-    <a href="{% url 'previews:detail' %}">Preview</a>
-  {% else %}
-    <span class="is-disabled" aria-disabled="true">Preview</span>
-  {% endif %}
-
-  {% if sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' or sprint.state == 'COMPLETED' %}
-    <a href="{% url 'prepkits:detail' %}">Prep Kit</a>
-  {% else %}
-    <span class="is-disabled" aria-disabled="true">Prep Kit</span>
-  {% endif %}
-
-  {% if sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' or sprint.state == 'COMPLETED' %}
-    <a href="{% url 'practice:index' %}">Practice</a>
-  {% else %}
-    <span class="is-disabled" aria-disabled="true">Practice</span>
-  {% endif %}
-
-  {% if sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' or sprint.state == 'COMPLETED' %}
-    <a href="{% url 'plans:detail' %}">Plan</a>
-  {% else %}
-    <span class="is-disabled" aria-disabled="true">Plan</span>
-  {% endif %}
+  {% for step in workflow_steps %}
+    {% if step.target_url %}
+      <a class="is-{{ step.status }}" href="{{ step.target_url }}"{% if step.status == "current" %} aria-current="step"{% endif %}>
+        <span class="workspace-nav-marker" aria-hidden="true">{% if step.status == "complete" %}✓{% else %}{{ step.number }}{% endif %}</span>
+        <span>{{ step.label }}</span>
+      </a>
+    {% else %}
+      <span class="is-disabled is-{{ step.status }}" aria-disabled="true">
+        <span class="workspace-nav-marker" aria-hidden="true">{{ step.number }}</span>
+        <span>{{ step.label }}</span>
+      </span>
+    {% endif %}
+  {% endfor %}
 </nav>
 
 <dl class="summary-list">

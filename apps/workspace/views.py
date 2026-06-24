@@ -1,8 +1,10 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from apps.sprints.services import SprintWorkflowService
+from apps.workspace.presentation import build_workflow_steps
 
 
 @login_required
@@ -12,7 +14,15 @@ def index(request):
         .order_by("-created_at", "-id")
         .first()
     )
-    return render(request, "workspace/index.html", {"sprint": sprint})
+    workflow_steps = build_workflow_steps(
+        sprint.state if sprint else None,
+        url_resolver=reverse,
+    )
+    return render(
+        request,
+        "workspace/index.html",
+        {"sprint": sprint, "workflow_steps": workflow_steps},
+    )
 
 
 @login_required

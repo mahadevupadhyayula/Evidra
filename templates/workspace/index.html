@@ -20,12 +20,19 @@
       </header>
 
       <section class="workspace-progress" aria-label="Sprint progress">
-        <span class="workspace-progress-step{% if sprint %} is-active{% endif %}">Resume</span>
-        <span class="workspace-progress-step{% if sprint.state == 'RESUME_READY' or sprint.state == 'PROFILE_CONFIRMED' or sprint.state == 'OPPORTUNITY_CONFIRMED' or sprint.state == 'EVIDENCE_REVIEW' or sprint.state == 'EVIDENCE_APPROVED' or sprint.state == 'STORIES_READY' or sprint.state == 'MATCHING_READY' or sprint.state == 'PREVIEW_READY' or sprint.state == 'PAYMENT_PENDING' or sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' %} is-active{% endif %}">Profile</span>
-        <span class="workspace-progress-step{% if sprint.state == 'OPPORTUNITY_CONFIRMED' or sprint.state == 'EVIDENCE_REVIEW' or sprint.state == 'EVIDENCE_APPROVED' or sprint.state == 'STORIES_READY' or sprint.state == 'MATCHING_READY' or sprint.state == 'PREVIEW_READY' or sprint.state == 'PAYMENT_PENDING' or sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' %} is-active{% endif %}">Opportunity</span>
-        <span class="workspace-progress-step{% if sprint.state == 'EVIDENCE_APPROVED' or sprint.state == 'STORIES_READY' or sprint.state == 'MATCHING_READY' or sprint.state == 'PREVIEW_READY' or sprint.state == 'PAYMENT_PENDING' or sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' %} is-active{% endif %}">Evidence</span>
-        <span class="workspace-progress-step{% if sprint.state == 'STORIES_READY' or sprint.state == 'MATCHING_READY' or sprint.state == 'PREVIEW_READY' or sprint.state == 'PAYMENT_PENDING' or sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' %} is-active{% endif %}">Stories</span>
-        <span class="workspace-progress-step{% if sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' %} is-active{% endif %}">Prep</span>
+        {% for step in workflow_steps %}
+          {% if step.target_url %}
+            <a class="workspace-progress-step is-{{ step.status }}" href="{{ step.target_url }}"{% if step.status == "current" %} aria-current="step"{% endif %}>
+              <span class="workspace-progress-marker" aria-hidden="true">{% if step.status == "complete" %}✓{% else %}{{ step.number }}{% endif %}</span>
+              <span>{{ step.label }}</span>
+            </a>
+          {% else %}
+            <span class="workspace-progress-step is-{{ step.status }}"{% if step.status == "locked" %} aria-disabled="true"{% endif %}{% if step.status == "current" %} aria-current="step"{% endif %}>
+              <span class="workspace-progress-marker" aria-hidden="true">{% if step.status == "complete" %}✓{% else %}{{ step.number }}{% endif %}</span>
+              <span>{{ step.label }}</span>
+            </span>
+          {% endif %}
+        {% endfor %}
       </section>
 
       <div class="workspace-grid">
