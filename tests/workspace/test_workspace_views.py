@@ -122,6 +122,27 @@ def test_workspace_next_step_uses_post_form_to_create_sprint(client):
 
 
 @pytest.mark.django_db
+def test_workspace_displays_static_evidra_flow_explainer(client):
+    user = get_user_model().objects.create_user(username="flow@example.com")
+    client.force_login(user)
+
+    response = client.get(reverse("workspace:index"))
+
+    assert response.status_code == 200
+    assert b"The Evidra Flow" in response.content
+    assert b"Our evidence-first system." in response.content
+    assert b"Real work" in response.content
+    assert b"Capture outcomes and impact from your experience." in response.content
+    assert b"Evidence" in response.content
+    assert b"Organize and validate proof of your impact." in response.content
+    assert b"Stories" in response.content
+    assert b"Turn evidence into compelling interview stories." in response.content
+    assert b"Prep Kit" in response.content
+    assert b"Get tailored materials to prepare and practice." in response.content
+    assert b"Learn more about the process" not in response.content
+
+
+@pytest.mark.django_db
 def test_workspace_dashboard_metrics_are_current_user_current_sprint_only(client):
     from apps.evidence.models import EvidenceCard, EvidenceStatus
     from apps.matching.models import StoryMatch
