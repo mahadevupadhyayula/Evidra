@@ -3,6 +3,34 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 
 
+def assert_no_active_social_login(response):
+    html = response.content.decode().lower()
+    forbidden_fragments = [
+        "continue with google",
+        "accounts/google",
+        "google/login",
+        "oauth",
+        "social",
+        "provider_login_url",
+    ]
+    for fragment in forbidden_fragments:
+        assert fragment not in html, fragment
+
+
+def test_signup_view_has_no_active_social_login(client):
+    response = client.get(reverse("accounts:signup"))
+
+    assert response.status_code == 200
+    assert_no_active_social_login(response)
+
+
+def test_login_view_has_no_active_social_login(client):
+    response = client.get(reverse("accounts:login"))
+
+    assert response.status_code == 200
+    assert_no_active_social_login(response)
+
+
 @pytest.mark.django_db
 def test_signup_view_creates_user_and_logs_in(client):
     response = client.post(
