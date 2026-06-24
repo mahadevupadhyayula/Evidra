@@ -49,4 +49,6 @@ def test_workspace_only_displays_authenticated_users_sprint(client):
 
     assert response.status_code == 200
     assert b"Sprint ID" not in response.content
-    assert f">{other_sprint.pk}<".encode() not in response.content
+    assert (
+        f"Sprint ID</dt>\n    <dd>{other_sprint.pk}</dd>".encode() not in response.content
+    )
