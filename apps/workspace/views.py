@@ -64,6 +64,12 @@ def index(request):
         sprint.state if sprint else None,
         url_resolver=reverse,
     )
+    current_opportunity = (
+        OpportunityService.get_current_opportunity(user=request.user, sprint=sprint)
+        if sprint is not None
+        else None
+    )
+    opportunity_summary = build_current_opportunity_summary(current_opportunity, workflow_steps)
     next_step = build_next_step(request.user, sprint, url_resolver=reverse)
     dashboard_metrics = build_dashboard_metrics(
         user=request.user,

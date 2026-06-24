@@ -2,6 +2,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
+from apps.opportunities.models import Opportunity, OpportunityStatus
 from apps.sprints.models import InterviewSprint, SprintState
 
 

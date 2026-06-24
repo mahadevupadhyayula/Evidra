@@ -6,6 +6,34 @@ from dataclasses import dataclass
 from apps.sprints.models import SprintState
 
 
+def count_completed_workflow_steps(workflow_steps: list[dict[str, object]]) -> int:
+    """Count completed presentation steps from the deterministic workflow tracker."""
+
+    return sum(1 for step in workflow_steps if step["status"] == "complete")
+
+
+def build_current_opportunity_summary(
+    opportunity, workflow_steps: list[dict[str, object]]
+) -> dict[str, object] | None:
+    """Build the workspace summary for the current non-stale opportunity."""
+
+    if opportunity is None:
+        return None
+
+    return {
+        "role_title": opportunity.role_title,
+        "company_name": opportunity.company_name,
+        "target_seniority": opportunity.target_seniority,
+        "role_family": opportunity.get_role_family_display(),
+        "interview_stage": opportunity.interview_stage,
+        "interview_date": opportunity.interview_date,
+        "confirmation_status": opportunity.get_confirmation_status_display(),
+        "status_label": "Active",
+        "completed_steps": count_completed_workflow_steps(workflow_steps),
+        "total_steps": len(workflow_steps),
+    }
+
+
 @dataclass(frozen=True)
 class WorkflowStepDefinition:
     number: int
