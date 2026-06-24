@@ -952,3 +952,46 @@ input {
     border-radius: 1.1rem;
   }
 }
+
+.workspace-panel-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.status-pill {
+  background: #dcfce7;
+  border-radius: 999px;
+  color: #047857;
+  font-size: 0.78rem;
+  font-weight: 900;
+  padding: 0.35rem 0.65rem;
+}
+
+.opportunity-title {
+  color: #0f172a;
+  font-weight: 800;
+  margin-bottom: 1rem;
+}
+
+.opportunity-summary-list {
+  display: grid;
+  gap: 0.45rem 0.75rem;
+  grid-template-columns: max-content minmax(0, 1fr);
+  margin: 0;
+}
+
+.opportunity-summary-list dt {
+  color: #475569;
+  font-weight: 900;
+}
+
+.opportunity-summary-list dd {
+  color: #0f172a;
+  margin: 0;
+}
+
+.opportunity-progress {
+  font-weight: 800;
+}

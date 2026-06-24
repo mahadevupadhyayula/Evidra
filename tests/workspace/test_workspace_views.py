@@ -2,6 +2,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
+from apps.opportunities.models import Opportunity, OpportunityStatus
 from apps.sprints.models import InterviewSprint, SprintState
 
 
@@ -105,3 +106,73 @@ def test_workspace_next_step_uses_post_form_to_create_sprint(client):
         in response.content
     )
     assert b"Your data is private and secure." in response.content
+
+
+@pytest.mark.django_db
+def test_workspace_current_opportunity_card_only_displays_authenticated_users_opportunity(client):
+    User = get_user_model()
+    owner = User.objects.create_user(username="opportunity-owner@example.com")
+    viewer = User.objects.create_user(username="opportunity-viewer@example.com")
+    owner_sprint = InterviewSprint.objects.create(
+        user=owner, state=SprintState.OPPORTUNITY_CONFIRMED
+    )
+    viewer_sprint = InterviewSprint.objects.create(
+        user=viewer, state=SprintState.OPPORTUNITY_CONFIRMED
+    )
+    Opportunity.objects.create(
+        sprint=owner_sprint,
+        role_title="Principal Product Manager",
+        role_family="PRODUCT_MANAGEMENT",
+        target_seniority="Principal",
+        company_name="OtherCo",
+        job_description="Own product strategy and measurable customer outcomes. " * 2,
+        interview_stage="Panel",
+        confirmation_status=OpportunityStatus.CONFIRMED,
+    )
+    Opportunity.objects.create(
+        sprint=viewer_sprint,
+        role_title="Senior Product Manager",
+        role_family="AI_PRODUCT_MANAGEMENT",
+        target_seniority="Senior",
+        company_name="ViewerCo",
+        job_description="Lead AI product discovery and measurable roadmap outcomes. " * 2,
+        interview_stage="Hiring manager",
+        confirmation_status=OpportunityStatus.CONFIRMED,
+    )
+    client.force_login(viewer)
+
+    response = client.get(reverse("workspace:index"))
+
+    assert response.status_code == 200
+    assert b"Senior Product Manager at ViewerCo" in response.content
+    assert b"AI Product Management" in response.content
+    assert b"Hiring manager" in response.content
+    assert b"Active" in response.content
+    assert b"3 of 10 workflow steps completed." in response.content
+    assert f'href="{reverse("opportunities:opportunity_detail")}"'.encode() in response.content
+    assert b"Principal Product Manager" not in response.content
+    assert b"OtherCo" not in response.content
+
+
+@pytest.mark.django_db
+def test_workspace_current_opportunity_card_ignores_stale_opportunity(client):
+    user = get_user_model().objects.create_user(username="stale-opportunity@example.com")
+    sprint = InterviewSprint.objects.create(user=user, state=SprintState.OPPORTUNITY_CONFIRMED)
+    Opportunity.objects.create(
+        sprint=sprint,
+        role_title="Stale Product Manager",
+        role_family="PRODUCT_MANAGEMENT",
+        target_seniority="Senior",
+        company_name="StaleCo",
+        job_description="Own product strategy and measurable customer outcomes. " * 2,
+        confirmation_status=OpportunityStatus.STALE,
+    )
+    client.force_login(user)
+
+    response = client.get(reverse("workspace:index"))
+
+    assert response.status_code == 200
+    assert b"Stale Product Manager" not in response.content
+    assert b"StaleCo" not in response.content
+    assert b"Active" not in response.content
+    assert b"No active opportunity has been added to this Sprint yet." in response.content
