@@ -313,6 +313,7 @@ input {
 .auth-panel {
   align-items: center;
   display: flex;
+  flex-direction: column;
   justify-content: center;
 }
 
@@ -482,10 +483,13 @@ input {
   background: #eef2ff;
   border: 1px solid #e0e7ff;
   border-radius: 1rem;
+  box-sizing: border-box;
   color: #4b5563;
   margin-top: 1.25rem;
+  max-width: 460px;
   padding: 0.85rem 1rem;
   text-align: center;
+  width: 100%;
 }
 
 .auth-login-strip a {

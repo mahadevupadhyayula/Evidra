@@ -61,8 +61,20 @@ def test_signup_view_omits_terms_privacy_links_without_approved_legal_pages(clie
 def test_signup_view_links_to_login(client):
     response = client.get(reverse("accounts:signup"))
 
+    html = response.content.decode()
     assert response.status_code == 200
-    assert f'href="{reverse("accounts:login")}"' in response.content.decode()
+    assert 'class="auth-login-strip"' in html
+    assert "Already have an account?" in html
+    assert f'href="{reverse("accounts:login")}"' in html
+
+
+def test_login_view_omits_secondary_login_strip(client):
+    response = client.get(reverse("accounts:login"))
+
+    html = response.content.decode()
+    assert response.status_code == 200
+    assert 'class="auth-login-strip"' not in html
+    assert "Already have an account?" not in html
 
 
 @pytest.mark.django_db
