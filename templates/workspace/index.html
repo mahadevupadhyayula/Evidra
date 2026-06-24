@@ -61,6 +61,25 @@
           </dl>
         </section>
 
+        <section class="workspace-panel" aria-labelledby="recent-activity-title">
+          <h2 id="recent-activity-title">Recent activity</h2>
+          {% if recent_activity %}
+            <ul class="workspace-recent-activity">
+              {% for item in recent_activity %}
+                <li class="workspace-recent-activity-item is-{{ item.type }}">
+                  <a href="{{ item.target_url }}">
+                    <span class="workspace-recent-activity-label">{{ item.label }}</span>
+                    <span class="workspace-recent-activity-title">{{ item.title }}</span>
+                    <time datetime="{{ item.timestamp|date:'c' }}">{{ item.timestamp|date:"M j, Y" }}</time>
+                  </a>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p>Your recent Sprint updates will appear here.</p>
+          {% endif %}
+        </section>
+
         <section class="workspace-panel">
           <h2>How Evidra protects readiness</h2>
           <ul>

@@ -6,9 +6,15 @@ from django.views.decorators.http import require_POST
 
 from apps.evidence.models import EvidenceCard, EvidenceStatus
 from apps.matching.models import StoryMatch
+from apps.opportunities.services import OpportunityService
 from apps.sprints.services import SprintWorkflowService
 from apps.stories.models import Story, StoryStatus
-from apps.workspace.presentation import build_next_step, build_workflow_steps
+from apps.workspace.presentation import (
+    build_current_opportunity_summary,
+    build_next_step,
+    build_recent_activity,
+    build_workflow_steps,
+)
 
 
 def build_dashboard_metrics(*, user, sprint, next_step):
@@ -76,6 +82,11 @@ def index(request):
         sprint=sprint,
         next_step=next_step,
     )
+    recent_activity = build_recent_activity(
+        user=request.user,
+        sprint=sprint,
+        url_resolver=reverse,
+    )
     return render(
         request,
         "workspace/index.html",
@@ -84,6 +95,8 @@ def index(request):
             "workflow_steps": workflow_steps,
             "next_step": next_step,
             "dashboard_metrics": dashboard_metrics,
+            "opportunity_summary": opportunity_summary,
+            "recent_activity": recent_activity,
         },
     )
 

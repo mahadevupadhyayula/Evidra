@@ -2,7 +2,6 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
-from apps.opportunities.models import Opportunity, OpportunityStatus
 from apps.sprints.models import InterviewSprint, SprintState
 
 
@@ -249,3 +248,114 @@ def test_workspace_dashboard_metrics_are_null_safe_without_sprint_or_profile(cli
     assert metrics["approved_evidence_count"] == 0
     assert metrics["ready_story_count"] == 0
     assert metrics["readiness_score"] is None
+
+
+@pytest.mark.django_db
+def test_workspace_recent_activity_uses_owned_current_sprint_records_only(client):
+    from apps.evidence.models import EvidenceCard, EvidenceStatus
+    from apps.plans.models import ImprovementPlan, ImprovementPlanStatus
+    from apps.prepkits.models import PrepKit, PrepKitStatus
+    from apps.previews.models import ReadinessPreview, ReadinessPreviewStatus
+    from apps.stories.models import Story, StoryStatus
+    from tests.opportunities.helpers import make_profile_confirmed_sprint
+
+    user, sprint, profile = make_profile_confirmed_sprint("activity@example.com")
+    other_user, other_sprint, other_profile = make_profile_confirmed_sprint(
+        "other-activity@example.com"
+    )
+
+    EvidenceCard.objects.create(
+        user=user,
+        profile=profile,
+        source_document=sprint.active_resume,
+        title="Owned approved evidence title",
+        source_excerpt="Owned excerpt",
+        status=EvidenceStatus.APPROVED,
+    )
+    EvidenceCard.objects.create(
+        user=other_user,
+        profile=other_profile,
+        source_document=other_sprint.active_resume,
+        title="Led migration to AWS reducing costs by 32%",
+        source_excerpt="Other excerpt",
+        status=EvidenceStatus.APPROVED,
+    )
+    Story.objects.create(
+        user=user,
+        profile=profile,
+        title="Owned edited story title",
+        short_answer="Short answer",
+        ninety_second_answer="Ninety second answer",
+        detailed_answer="Detailed answer",
+        status=StoryStatus.EDITED,
+    )
+    Story.objects.create(
+        user=other_user,
+        profile=other_profile,
+        title="Other ready story title",
+        short_answer="Short answer",
+        ninety_second_answer="Ninety second answer",
+        detailed_answer="Detailed answer",
+        status=StoryStatus.READY,
+    )
+    PrepKit.objects.create(
+        sprint=sprint,
+        status=PrepKitStatus.READY,
+        input_revision="owned-prepkit-revision",
+    )
+    PrepKit.objects.create(
+        sprint=other_sprint,
+        status=PrepKitStatus.READY,
+        input_revision="other-prepkit-revision",
+    )
+    ReadinessPreview.objects.create(
+        sprint=sprint,
+        role_summary="Owned preview",
+        prepkit_explanation="Owned explanation",
+        input_revision="owned-preview-revision",
+        status=ReadinessPreviewStatus.READY,
+    )
+    ReadinessPreview.objects.create(
+        sprint=other_sprint,
+        role_summary="Other preview",
+        prepkit_explanation="Other explanation",
+        input_revision="other-preview-revision",
+        status=ReadinessPreviewStatus.READY,
+    )
+    ImprovementPlan.objects.create(
+        sprint=sprint,
+        status=ImprovementPlanStatus.ACTIVE,
+        generated_from_revision="owned-plan-revision",
+    )
+    ImprovementPlan.objects.create(
+        sprint=other_sprint,
+        status=ImprovementPlanStatus.ACTIVE,
+        generated_from_revision="other-plan-revision",
+    )
+
+    client.force_login(user)
+    response = client.get(reverse("workspace:index"))
+
+    assert response.status_code == 200
+    activity = response.context["recent_activity"]
+    assert 3 <= len(activity) <= 5
+    assert any(item["title"] == "Owned approved evidence title" for item in activity)
+    assert any(item["title"] == "Owned edited story title" for item in activity)
+    assert b"Owned approved evidence title" in response.content
+    assert b"Owned edited story title" in response.content
+    assert b"Led migration to AWS reducing costs by 32%" not in response.content
+    assert b"Other ready story title" not in response.content
+
+
+@pytest.mark.django_db
+def test_workspace_recent_activity_empty_state_without_activity(client):
+    from tests.opportunities.helpers import make_profile_confirmed_sprint
+
+    user, _, _ = make_profile_confirmed_sprint("empty-activity@example.com")
+    client.force_login(user)
+
+    response = client.get(reverse("workspace:index"))
+
+    assert response.status_code == 200
+    assert response.context["recent_activity"] == []
+    assert b"Your recent Sprint updates will appear here." in response.content

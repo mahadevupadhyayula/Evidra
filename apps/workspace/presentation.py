@@ -110,6 +110,103 @@ def build_workflow_steps(
     return steps
 
 
+def build_recent_activity(
+    *, user, sprint, url_resolver: Callable[[str], str], limit: int = 5
+) -> list[dict[str, object]]:
+    """Build a derived recent activity list from owned current Sprint records."""
+
+    if sprint is None:
+        return []
+
+    from apps.evidence.models import EvidenceCard, EvidenceStatus
+    from apps.plans.models import ImprovementPlan, ImprovementPlanStatus
+    from apps.prepkits.models import PrepKit, PrepKitStatus
+    from apps.previews.models import ReadinessPreview, ReadinessPreviewStatus
+    from apps.stories.models import Story, StoryStatus
+
+    activity: list[dict[str, object]] = []
+
+    if sprint.active_profile_id is not None:
+        activity.extend(
+            {
+                "label": "Evidence approved",
+                "title": evidence.title,
+                "timestamp": evidence.updated_at,
+                "target_url": url_resolver("evidence:evidence_review"),
+                "type": "evidence",
+            }
+            for evidence in EvidenceCard.objects.filter(
+                user=user,
+                profile=sprint.active_profile,
+                status=EvidenceStatus.APPROVED,
+            ).only("title", "updated_at")[:limit]
+        )
+        activity.extend(
+            {
+                "label": "Story ready" if story.status == StoryStatus.READY else "Story edited",
+                "title": story.title,
+                "timestamp": story.updated_at,
+                "target_url": url_resolver("stories:story_bank"),
+                "type": "story",
+            }
+            for story in Story.objects.filter(
+                user=user,
+                profile=sprint.active_profile,
+                status__in=[StoryStatus.READY, StoryStatus.EDITED],
+            ).only("title", "status", "updated_at")[:limit]
+        )
+
+    current_prep_kit_statuses = [PrepKitStatus.PENDING, PrepKitStatus.READY]
+    activity.extend(
+        {
+            "label": "Prep Kit current",
+            "title": prep_kit.get_status_display(),
+            "timestamp": prep_kit.updated_at,
+            "target_url": url_resolver("prepkits:detail"),
+            "type": "prepkit",
+        }
+        for prep_kit in PrepKit.objects.filter(
+            sprint=sprint,
+            sprint__user=user,
+            status__in=current_prep_kit_statuses,
+        ).only("status", "updated_at")[:limit]
+    )
+
+    current_preview_statuses = [ReadinessPreviewStatus.DRAFT, ReadinessPreviewStatus.READY]
+    activity.extend(
+        {
+            "label": "Readiness preview current",
+            "title": preview.get_status_display(),
+            "timestamp": preview.updated_at,
+            "target_url": url_resolver("previews:detail"),
+            "type": "preview",
+        }
+        for preview in ReadinessPreview.objects.filter(
+            sprint=sprint,
+            sprint__user=user,
+            status__in=current_preview_statuses,
+        ).only("status", "updated_at")[:limit]
+    )
+
+    current_plan_statuses = [ImprovementPlanStatus.DRAFT, ImprovementPlanStatus.ACTIVE]
+    activity.extend(
+        {
+            "label": "Improvement plan current",
+            "title": plan.get_status_display(),
+            "timestamp": plan.updated_at,
+            "target_url": url_resolver("plans:detail"),
+            "type": "plan",
+        }
+        for plan in ImprovementPlan.objects.filter(
+            sprint=sprint,
+            sprint__user=user,
+            status__in=current_plan_statuses,
+        ).only("status", "updated_at")[:limit]
+    )
+
+    return sorted(activity, key=lambda item: item["timestamp"], reverse=True)[:limit]
+
+
 def build_next_step(
     user,
     sprint,
