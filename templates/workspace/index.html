@@ -47,36 +47,18 @@
           <p>{{ next_step.reassurance }}</p>
         </section>
 
-        <section class="workspace-panel workspace-opportunity-summary" aria-labelledby="current-opportunity-title">
-          <div class="workspace-panel-header">
-            <div>
-              <p class="eyebrow">Current opportunity</p>
-              <h2 id="current-opportunity-title">Opportunity summary</h2>
-            </div>
-            {% if opportunity_summary %}
-              <span class="status-pill">{{ opportunity_summary.status_label }}</span>
-            {% endif %}
-          </div>
-          {% if opportunity_summary %}
-            <p class="opportunity-title">{{ opportunity_summary.role_title }}{% if opportunity_summary.company_name %} at {{ opportunity_summary.company_name }}{% endif %}</p>
-            <dl class="opportunity-summary-list">
-              <dt>Seniority</dt>
-              <dd>{{ opportunity_summary.target_seniority|default:"Not provided" }}</dd>
-              <dt>Role family</dt>
-              <dd>{{ opportunity_summary.role_family|default:"Not provided" }}</dd>
-              <dt>Interview stage</dt>
-              <dd>{{ opportunity_summary.interview_stage|default:"Not provided" }}</dd>
-              <dt>Interview date</dt>
-              <dd>{{ opportunity_summary.interview_date|date:"M j, Y"|default:"Not provided" }}</dd>
-              <dt>Confirmation</dt>
-              <dd>{{ opportunity_summary.confirmation_status }}</dd>
-            </dl>
-            <p class="opportunity-progress">{{ opportunity_summary.completed_steps }} of {{ opportunity_summary.total_steps }} workflow steps completed.</p>
-            <p><a class="button-link" href="{% url 'opportunities:opportunity_detail' %}">View Opportunity</a></p>
-          {% else %}
-            <p>No active opportunity has been added to this Sprint yet.</p>
-            <p><a class="button-link" href="{% url 'opportunities:opportunity_detail' %}">View Opportunity</a></p>
-          {% endif %}
+        <section class="workspace-panel" aria-labelledby="dashboard-metrics-title">
+          <h2 id="dashboard-metrics-title">Dashboard metrics</h2>
+          <dl>
+            <dt>Approved evidence</dt>
+            <dd>{{ dashboard_metrics.approved_evidence_count }}</dd>
+            <dt>Ready stories</dt>
+            <dd>{{ dashboard_metrics.ready_story_count }}</dd>
+            <dt>Readiness score</dt>
+            <dd>{% if dashboard_metrics.readiness_score is not None %}{{ dashboard_metrics.readiness_score }}{% else %}Not available yet{% endif %}</dd>
+            <dt>Next step</dt>
+            <dd>{{ dashboard_metrics.next_step_summary.title }}</dd>
+          </dl>
         </section>
 
         <section class="workspace-panel">
