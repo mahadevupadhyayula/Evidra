@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -142,6 +143,20 @@ INTERVIEW_SPRINT_PRICE_AMOUNT = int(
 )
 INTERVIEW_SPRINT_PRICE_CURRENCY = os.getenv("INTERVIEW_SPRINT_PRICE_CURRENCY", "INR")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+if "pytest" in sys.argv:
+    EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+elif DEBUG:
+    EMAIL_BACKEND = os.getenv(
+        "DJANGO_EMAIL_BACKEND",
+        "django.core.mail.backends.console.EmailBackend",
+    )
+else:
+    EMAIL_BACKEND = os.getenv(
+        "DJANGO_EMAIL_BACKEND",
+        "django.core.mail.backends.smtp.EmailBackend",
+    )
+DEFAULT_FROM_EMAIL = os.getenv("DJANGO_DEFAULT_FROM_EMAIL", "Evidra <noreply@evidra.local>")
 
 LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "workspace:index"
