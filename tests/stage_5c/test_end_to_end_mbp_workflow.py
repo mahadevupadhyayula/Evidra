@@ -77,6 +77,7 @@ def test_complete_mbp_workflow_from_signup_to_completed_sprint(client, django_us
     signup_response = client.post(
         "/accounts/signup/",
         {
+            "full_name": "Stage Five C",
             "email": "stage5c@example.com",
             "password1": "Str0ng-test-pass!",
             "password2": "Str0ng-test-pass!",
