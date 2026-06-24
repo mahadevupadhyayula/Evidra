@@ -128,3 +128,209 @@ input {
 .summary-list dt {
   font-weight: 800;
 }
+
+.auth-page {
+  background: linear-gradient(135deg, #fff7ea 0%, #f0dfc9 52%, #e8d0b2 100%);
+  border: 1px solid #e3cfb5;
+  border-radius: 1.75rem;
+  box-shadow: 0 28px 80px rgb(85 55 24 / 12%);
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+  margin: -1rem calc(50% - 50vw) 0;
+  min-height: calc(100vh - 9rem);
+  overflow: hidden;
+  padding: clamp(1.25rem, 3vw, 3rem);
+}
+
+.auth-marketing {
+  color: #2b1d12;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  justify-content: space-between;
+  padding: clamp(0.5rem, 2vw, 1.5rem);
+}
+
+.auth-brand {
+  align-items: center;
+  color: #3d2412;
+  display: inline-flex;
+  font-size: 1.15rem;
+  font-weight: 900;
+  gap: 0.65rem;
+  text-decoration: none;
+}
+
+.auth-brand-mark {
+  align-items: center;
+  background: #6c3c17;
+  border-radius: 0.85rem;
+  box-shadow: 0 12px 30px rgb(108 60 23 / 22%);
+  color: #fffaf2;
+  display: inline-flex;
+  height: 2.4rem;
+  justify-content: center;
+  width: 2.4rem;
+}
+
+.auth-copy {
+  max-width: 680px;
+}
+
+.auth-copy h1 {
+  font-size: clamp(2.4rem, 5vw, 4.85rem);
+  letter-spacing: -0.06em;
+  line-height: 0.95;
+  margin: 0.5rem 0 1rem;
+}
+
+.auth-lede {
+  color: #5d4938;
+  font-size: clamp(1rem, 1.7vw, 1.2rem);
+  line-height: 1.7;
+  max-width: 620px;
+}
+
+.workflow-cards {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.workflow-card {
+  background: rgb(255 250 242 / 72%);
+  border: 1px solid rgb(108 60 23 / 12%);
+  border-radius: 1.2rem;
+  box-shadow: 0 16px 38px rgb(85 55 24 / 8%);
+  padding: 1rem;
+}
+
+.workflow-icon {
+  align-items: center;
+  background: #f3dfc4;
+  border-radius: 999px;
+  color: #6c3c17;
+  display: inline-flex;
+  font-weight: 900;
+  height: 2rem;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+  width: 2rem;
+}
+
+.workflow-card h2 {
+  font-size: 1rem;
+  margin: 0 0 0.35rem;
+}
+
+.workflow-card p,
+.trust-props span,
+.trusted-by {
+  color: #6b5a4b;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.trust-props {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.trust-props div {
+  background: rgb(255 250 242 / 50%);
+  border-radius: 1rem;
+  padding: 0.9rem;
+}
+
+.trust-props strong,
+.trust-props span {
+  display: block;
+}
+
+.trust-props strong {
+  margin-bottom: 0.25rem;
+}
+
+.trusted-by {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.trusted-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.trusted-badges span {
+  border: 1px solid rgb(108 60 23 / 14%);
+  border-radius: 999px;
+  color: #7c6c5d;
+  padding: 0.35rem 0.65rem;
+}
+
+.auth-panel {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+}
+
+.auth-card {
+  background: #fff;
+  border: 1px solid #f0e4d6;
+  border-radius: 1.5rem;
+  box-shadow: 0 28px 70px rgb(55 34 18 / 16%);
+  max-width: 460px;
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+  width: 100%;
+}
+
+.auth-card h1 {
+  font-size: 2rem;
+  letter-spacing: -0.035em;
+  margin: 0.35rem 0 1.5rem;
+}
+
+.auth-card button[type="submit"] {
+  margin-top: 0.25rem;
+  width: 100%;
+}
+
+.auth-card input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+  .auth-page {
+    grid-template-columns: 1fr;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .workflow-cards,
+  .trust-props {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .page-shell {
+    padding: 1.25rem 1rem;
+  }
+
+  .auth-page {
+    border-radius: 1.2rem;
+    padding: 1rem;
+  }
+
+  .workflow-cards,
+  .trust-props {
+    grid-template-columns: 1fr;
+  }
+}

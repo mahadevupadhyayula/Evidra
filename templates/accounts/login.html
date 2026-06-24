@@ -1,19 +1,50 @@
 {% extends "base.html" %}
 {% block title %}Log in · Evidra{% endblock %}
 {% block content %}
-  <section class="card narrow">
-    <h1>Log in</h1>
-    <form method="post" novalidate>
-      {% csrf_token %}
-      {{ form.non_field_errors }}
-      {% for field in form %}
-        <div class="field">
-          {{ field.label_tag }}
-          {{ field }}
-          {{ field.errors }}
-        </div>
-      {% endfor %}
-      <button type="submit">Log in</button>
-    </form>
+  <section class="auth-page">
+    <aside class="auth-marketing" aria-label="Evidra overview">
+      <a class="auth-brand" href="{% url 'home' %}" aria-label="Evidra.ai home">
+        <span class="auth-brand-mark">E</span>
+        <span>Evidra.ai</span>
+      </a>
+      <div class="auth-copy">
+        <p class="eyebrow">Career evidence workspace</p>
+        <h1>Turn your career evidence into interview readiness</h1>
+        <p class="auth-lede">Evidra turns real work into organized evidence, grounded stories, and focused prep so every answer starts from what you have actually done.</p>
+      </div>
+      <div class="workflow-cards" aria-label="Evidra workflow">
+        <article class="workflow-card"><span class="workflow-icon" aria-hidden="true">↳</span><h2>Real Work</h2><p>Capture projects, decisions, and outcomes from your actual experience.</p></article>
+        <article class="workflow-card"><span class="workflow-icon" aria-hidden="true">◌</span><h2>Evidence</h2><p>Connect claims to source-backed proof before shaping your narrative.</p></article>
+        <article class="workflow-card"><span class="workflow-icon" aria-hidden="true">✦</span><h2>Stories</h2><p>Build concise interview stories that preserve every source reference.</p></article>
+        <article class="workflow-card"><span class="workflow-icon" aria-hidden="true">▣</span><h2>Prep Kit</h2><p>Practice with role-specific prompts and a ready-to-use prep package.</p></article>
+      </div>
+      <div class="trust-props" aria-label="Trust and value props">
+        <div><strong>Private and secure</strong><span>Your work history stays yours.</span></div>
+        <div><strong>Evidence-first workflow</strong><span>Stories stay grounded in approved proof.</span></div>
+        <div><strong>Role-specific prep</strong><span>Focus preparation around your target role.</span></div>
+      </div>
+      <div class="trusted-by" aria-label="Trusted by">
+        <span>Trusted by candidates from</span>
+        <div class="trusted-badges"><span>Northstar</span><span>Atlas Co.</span><span>Summit Labs</span></div>
+      </div>
+    </aside>
+    <div class="auth-panel">
+      <div class="auth-card">
+        <p class="eyebrow">Welcome back</p>
+        <h1>Log in</h1>
+        <form method="post" novalidate>
+          {% csrf_token %}
+          {{ form.non_field_errors }}
+          {% for field in form %}
+            <div class="field">
+              {{ field.label_tag }}
+              {{ field }}
+              {{ field.errors }}
+            </div>
+          {% endfor %}
+          <button type="submit">Log in</button>
+        </form>
+      </div>
+    </div>
   </section>
 {% endblock %}
