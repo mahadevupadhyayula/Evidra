@@ -99,6 +99,17 @@ def test_login_view_links_to_signup(client):
     assert f'href="{reverse("accounts:signup")}"' in response.content.decode()
 
 
+def test_login_view_uses_email_presentation_with_username_field_name(client):
+    response = client.get(reverse("accounts:login"))
+
+    html = response.content.decode()
+    assert response.status_code == 200
+    assert '<label for="id_username">Email:</label>' in html
+    assert 'name="username"' in html
+    assert 'placeholder="name@company.com"' in html
+    assert 'placeholder="Enter your password"' in html
+
+
 @pytest.mark.django_db
 def test_login_and_logout_flow(client):
     get_user_model().objects.create_user(

@@ -1,6 +1,18 @@
 from django import forms
 from django.contrib.auth import get_user_model
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
+
+
+class EmailAuthenticationForm(AuthenticationForm):
+    username = forms.CharField(
+        label="Email",
+        widget=forms.TextInput(attrs={"placeholder": "name@company.com"}),
+    )
+    password = forms.CharField(
+        label="Password",
+        strip=False,
+        widget=forms.PasswordInput(attrs={"placeholder": "Enter your password"}),
+    )
 
 
 class EmailSignupForm(UserCreationForm):
