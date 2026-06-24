@@ -1,0 +1,76 @@
+<p class="workspace-brand" aria-label="Evidra.ai">Evidra.ai</p>
+<p class="eyebrow">Workspace</p>
+<h2>Interview readiness</h2>
+<p>Follow the approved Sprint path from source evidence to practice plan.</p>
+
+<nav class="workspace-nav" aria-label="Workspace navigation">
+  <a class="is-active" aria-current="page" href="{% url 'workspace:index' %}">Workspace</a>
+  {% if sprint %}
+    <a href="{% url 'documents:resume_upload' %}">Resume</a>
+  {% else %}
+    <span class="is-disabled" aria-disabled="true">Resume</span>
+  {% endif %}
+
+  {% if sprint.state == 'RESUME_READY' or sprint.state == 'PROFILE_CONFIRMED' or sprint.state == 'OPPORTUNITY_CONFIRMED' or sprint.state == 'EVIDENCE_REVIEW' or sprint.state == 'EVIDENCE_APPROVED' or sprint.state == 'STORIES_READY' or sprint.state == 'MATCHING_READY' or sprint.state == 'PREVIEW_READY' or sprint.state == 'PAYMENT_PENDING' or sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' or sprint.state == 'COMPLETED' %}
+    <a href="{% url 'profiles:profile_review' %}">Profile</a>
+  {% else %}
+    <span class="is-disabled" aria-disabled="true">Profile</span>
+  {% endif %}
+
+  {% if sprint.state == 'PROFILE_CONFIRMED' or sprint.state == 'OPPORTUNITY_CONFIRMED' or sprint.state == 'EVIDENCE_REVIEW' or sprint.state == 'EVIDENCE_APPROVED' or sprint.state == 'STORIES_READY' or sprint.state == 'MATCHING_READY' or sprint.state == 'PREVIEW_READY' or sprint.state == 'PAYMENT_PENDING' or sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' or sprint.state == 'COMPLETED' %}
+    <a href="{% url 'opportunities:opportunity_detail' %}">Opportunity</a>
+  {% else %}
+    <span class="is-disabled" aria-disabled="true">Opportunity</span>
+  {% endif %}
+
+  {% if sprint.state == 'OPPORTUNITY_CONFIRMED' or sprint.state == 'EVIDENCE_REVIEW' or sprint.state == 'EVIDENCE_APPROVED' or sprint.state == 'STORIES_READY' or sprint.state == 'MATCHING_READY' or sprint.state == 'PREVIEW_READY' or sprint.state == 'PAYMENT_PENDING' or sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' or sprint.state == 'COMPLETED' %}
+    <a href="{% url 'evidence:evidence_review' %}">Evidence</a>
+  {% else %}
+    <span class="is-disabled" aria-disabled="true">Evidence</span>
+  {% endif %}
+
+  {% if sprint.state == 'EVIDENCE_APPROVED' or sprint.state == 'STORIES_READY' or sprint.state == 'MATCHING_READY' or sprint.state == 'PREVIEW_READY' or sprint.state == 'PAYMENT_PENDING' or sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' or sprint.state == 'COMPLETED' %}
+    <a href="{% url 'stories:story_bank' %}">Stories</a>
+  {% else %}
+    <span class="is-disabled" aria-disabled="true">Stories</span>
+  {% endif %}
+
+  {% if sprint.state == 'STORIES_READY' or sprint.state == 'MATCHING_READY' or sprint.state == 'PREVIEW_READY' or sprint.state == 'PAYMENT_PENDING' or sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' or sprint.state == 'COMPLETED' %}
+    <a href="{% url 'matching:index' %}">Matching</a>
+  {% else %}
+    <span class="is-disabled" aria-disabled="true">Matching</span>
+  {% endif %}
+
+  {% if sprint.state == 'MATCHING_READY' or sprint.state == 'PREVIEW_READY' or sprint.state == 'PAYMENT_PENDING' or sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' or sprint.state == 'COMPLETED' %}
+    <a href="{% url 'previews:detail' %}">Preview</a>
+  {% else %}
+    <span class="is-disabled" aria-disabled="true">Preview</span>
+  {% endif %}
+
+  {% if sprint.state == 'PAID' or sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' or sprint.state == 'COMPLETED' %}
+    <a href="{% url 'prepkits:detail' %}">Prep Kit</a>
+  {% else %}
+    <span class="is-disabled" aria-disabled="true">Prep Kit</span>
+  {% endif %}
+
+  {% if sprint.state == 'PREPKIT_READY' or sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' or sprint.state == 'COMPLETED' %}
+    <a href="{% url 'practice:index' %}">Practice</a>
+  {% else %}
+    <span class="is-disabled" aria-disabled="true">Practice</span>
+  {% endif %}
+
+  {% if sprint.state == 'PRACTICE_ACTIVE' or sprint.state == 'PLAN_READY' or sprint.state == 'COMPLETED' %}
+    <a href="{% url 'plans:detail' %}">Plan</a>
+  {% else %}
+    <span class="is-disabled" aria-disabled="true">Plan</span>
+  {% endif %}
+</nav>
+
+<dl class="summary-list">
+  <dt>Status</dt>
+  <dd>{% if sprint %}{{ sprint.state }}{% else %}Not started{% endif %}</dd>
+  {% if sprint %}
+    <dt>Sprint ID</dt>
+    <dd>{{ sprint.id }}</dd>
+  {% endif %}
+</dl>

@@ -3,17 +3,7 @@
 {% block content %}
   <section class="workspace-shell" aria-labelledby="workspace-title">
     <aside class="workspace-sidebar" aria-label="Sprint overview">
-      <p class="eyebrow">Workspace</p>
-      <h2>Interview readiness</h2>
-      <p>Follow the approved Sprint path from source evidence to practice plan.</p>
-      <dl class="summary-list">
-        <dt>Status</dt>
-        <dd>{% if sprint %}{{ sprint.state }}{% else %}Not started{% endif %}</dd>
-        {% if sprint %}
-          <dt>Sprint ID</dt>
-          <dd>{{ sprint.id }}</dd>
-        {% endif %}
-      </dl>
+      {% include "workspace/_sidebar.html" %}
     </aside>
 
     <main class="workspace-main">
