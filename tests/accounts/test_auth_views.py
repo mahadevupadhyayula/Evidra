@@ -1,6 +1,9 @@
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.auth.tokens import default_token_generator
 from django.urls import reverse
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 
 
 def assert_no_active_social_login(response):
@@ -155,3 +158,78 @@ def test_login_password_toggle_is_non_submitting_button(client):
     assert html.count('type="button" class="auth-password-toggle"') == 1
     assert 'data-password-toggle="id_password"' in html
     assert 'aria-label="Show password"' in html
+
+@pytest.mark.django_db
+def test_login_view_links_to_password_reset_after_routes_exist(client):
+    response = client.get(reverse("accounts:login"))
+
+    html = response.content.decode()
+    assert response.status_code == 200
+    assert "Forgot password?" in html
+    assert f'href="{reverse("accounts:password_reset")}"' in html
+
+
+@pytest.mark.django_db
+def test_password_reset_request_sends_email_for_existing_user(client, mailoutbox):
+    get_user_model().objects.create_user(
+        username="reset@example.com",
+        email="reset@example.com",
+        password="A-strong-test-password-123",
+    )
+
+    response = client.post(
+        reverse("accounts:password_reset"),
+        {"email": "reset@example.com"},
+    )
+
+    assert response.status_code == 302
+    assert response.url == reverse("accounts:password_reset_done")
+    assert len(mailoutbox) == 1
+    assert "Reset your Evidra password" in mailoutbox[0].subject
+    assert "/accounts/password-reset/" in mailoutbox[0].body
+
+
+def test_password_reset_request_view_renders(client):
+    response = client.get(reverse("accounts:password_reset"))
+
+    html = response.content.decode()
+    assert response.status_code == 200
+    assert "Reset your password" in html
+    assert "Send reset link" in html
+
+
+def test_password_reset_sent_view_renders(client):
+    response = client.get(reverse("accounts:password_reset_done"))
+
+    html = response.content.decode()
+    assert response.status_code == 200
+    assert "Password reset email sent" in html
+
+
+@pytest.mark.django_db
+def test_password_reset_confirm_view_renders_for_valid_token(client):
+    user = get_user_model().objects.create_user(
+        username="reset-form@example.com",
+        email="reset-form@example.com",
+        password="A-strong-test-password-123",
+    )
+    uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+    token = default_token_generator.make_token(user)
+
+    response = client.get(
+        reverse("accounts:password_reset_confirm", kwargs={"uidb64": uidb64, "token": token}),
+        follow=True,
+    )
+
+    html = response.content.decode()
+    assert response.status_code == 200
+    assert "Choose a new password" in html
+    assert "Reset password" in html
+
+
+def test_password_reset_complete_view_renders(client):
+    response = client.get(reverse("accounts:password_reset_complete"))
+
+    html = response.content.decode()
+    assert response.status_code == 200
+    assert "Password reset complete" in html
