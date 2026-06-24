@@ -570,6 +570,14 @@ input {
   top: 1rem;
 }
 
+.workspace-brand {
+  color: #312e81;
+  font-size: 1.25rem;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  margin: 0 0 1rem;
+}
+
 .workspace-sidebar h2 {
   color: #111827;
   font-size: 1.1rem;
@@ -613,7 +621,8 @@ input {
 }
 
 .workspace-nav a,
-.workspace-nav button {
+.workspace-nav button,
+.workspace-nav span {
   align-items: center;
   background: transparent;
   border: 0;
@@ -634,6 +643,12 @@ input {
 .workspace-nav [aria-current="page"] {
   background: #eef2ff;
   color: #4338ca;
+}
+
+.workspace-nav .is-disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
 }
 
 .workspace-main {
@@ -831,7 +846,8 @@ input {
   }
 
   .workspace-nav a,
-  .workspace-nav button {
+  .workspace-nav button,
+  .workspace-nav span {
     flex: 0 0 auto;
     white-space: nowrap;
   }
