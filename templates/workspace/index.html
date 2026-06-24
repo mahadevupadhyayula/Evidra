@@ -47,6 +47,20 @@
           <p>{{ next_step.reassurance }}</p>
         </section>
 
+        <section class="workspace-panel" aria-labelledby="dashboard-metrics-title">
+          <h2 id="dashboard-metrics-title">Dashboard metrics</h2>
+          <dl>
+            <dt>Approved evidence</dt>
+            <dd>{{ dashboard_metrics.approved_evidence_count }}</dd>
+            <dt>Ready stories</dt>
+            <dd>{{ dashboard_metrics.ready_story_count }}</dd>
+            <dt>Readiness score</dt>
+            <dd>{% if dashboard_metrics.readiness_score is not None %}{{ dashboard_metrics.readiness_score }}{% else %}Not available yet{% endif %}</dd>
+            <dt>Next step</dt>
+            <dd>{{ dashboard_metrics.next_step_summary.title }}</dd>
+          </dl>
+        </section>
+
         <section class="workspace-panel">
           <h2>How Evidra protects readiness</h2>
           <ul>
