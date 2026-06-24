@@ -28,3 +28,21 @@
     <dd>{{ sprint.id }}</dd>
   {% endif %}
 </dl>
+
+<div class="workspace-sidebar-lower" aria-label="Account and Prep Kit status">
+  <section class="workspace-account-card" aria-labelledby="workspace-account-title">
+    <p class="eyebrow" id="workspace-account-title">Signed in as</p>
+    <p class="workspace-account-name">{{ sidebar_user.display_name }}</p>
+    {% if sidebar_user.email and sidebar_user.email != sidebar_user.display_name %}
+      <p class="workspace-account-email">{{ sidebar_user.email }}</p>
+    {% endif %}
+  </section>
+
+  {% if sidebar_payment_status %}
+    <section class="workspace-payment-card" aria-labelledby="workspace-payment-title">
+      <p class="eyebrow" id="workspace-payment-title">Prep Kit access</p>
+      <p class="workspace-payment-label">{{ sidebar_payment_status.label }}</p>
+      <p>{{ sidebar_payment_status.body }}</p>
+    </section>
+  {% endif %}
+</div>

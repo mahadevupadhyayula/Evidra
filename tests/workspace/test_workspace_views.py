@@ -380,3 +380,118 @@ def test_workspace_recent_activity_empty_state_without_activity(client):
     assert response.status_code == 200
     assert response.context["recent_activity"] == []
     assert b"Your recent Sprint updates will appear here." in response.content
+
+
+@pytest.mark.django_db
+def test_workspace_sidebar_uses_real_authenticated_user_identity(client):
+    user = get_user_model().objects.create_user(
+        username="identity-user",
+        email="identity@example.com",
+        first_name="Ada",
+        last_name="Lovelace",
+    )
+    client.force_login(user)
+
+    response = client.get(reverse("workspace:index"))
+
+    assert response.status_code == 200
+    assert b"Signed in as" in response.content
+    assert b"Ada Lovelace" in response.content
+    assert b"identity@example.com" in response.content
+    assert b"Pro Plan" not in response.content
+    assert b"Manage Plan" not in response.content
+    assert b"avatar" not in response.content.lower()
+
+
+@pytest.mark.django_db
+def test_workspace_sidebar_shows_paid_prep_kit_for_owned_current_sprint_payment(client):
+    from django.utils import timezone
+
+    from apps.payments.models import Payment, PaymentStatus
+
+    user = get_user_model().objects.create_user(username="paid-sidebar@example.com")
+    sprint = InterviewSprint.objects.create(user=user, state=SprintState.PAID)
+    Payment.objects.create(
+        user=user,
+        sprint=sprint,
+        amount=4900,
+        currency="INR",
+        status=PaymentStatus.PAID,
+        paid_at=timezone.now(),
+        provider_order_id="order_owned_sidebar",
+        provider_payment_id="pay_owned_sidebar",
+    )
+    client.force_login(user)
+
+    response = client.get(reverse("workspace:index"))
+
+    assert response.status_code == 200
+    assert b"Prep Kit unlocked" in response.content
+    assert b"Paid Prep Kit is available for this Sprint." in response.content
+    assert b"Prep Kit unlocks after payment" not in response.content
+    assert b"Pro Plan" not in response.content
+    assert b"renew" not in response.content.lower()
+    assert b"Manage Plan" not in response.content
+
+
+@pytest.mark.django_db
+def test_workspace_sidebar_payment_status_ignores_other_users_paid_payment(client):
+    from django.utils import timezone
+
+    from apps.payments.models import Payment, PaymentStatus
+
+    User = get_user_model()
+    user = User.objects.create_user(username="unpaid-sidebar@example.com")
+    sprint = InterviewSprint.objects.create(user=user, state=SprintState.PREVIEW_READY)
+    other_user = User.objects.create_user(username="other-paid-sidebar@example.com")
+    other_sprint = InterviewSprint.objects.create(user=other_user, state=SprintState.PAID)
+    Payment.objects.create(
+        user=other_user,
+        sprint=other_sprint,
+        amount=4900,
+        currency="INR",
+        status=PaymentStatus.PAID,
+        paid_at=timezone.now(),
+        provider_order_id="order_other_sidebar",
+        provider_payment_id="pay_other_sidebar",
+    )
+    client.force_login(user)
+
+    response = client.get(reverse("workspace:index"))
+
+    assert response.status_code == 200
+    assert response.context["sprint"] == sprint
+    assert b"Prep Kit locked" in response.content
+    assert b"Prep Kit unlocks after verified payment in the MBP flow." in response.content
+    assert b"Prep Kit unlocked" not in response.content
+    assert b"Paid Prep Kit is available for this Sprint." not in response.content
+
+
+@pytest.mark.django_db
+def test_workspace_sidebar_payment_status_ignores_non_current_sprint_payment(client):
+    from django.utils import timezone
+
+    from apps.payments.models import Payment, PaymentStatus
+
+    user = get_user_model().objects.create_user(username="current-only-sidebar@example.com")
+    paid_old_sprint = InterviewSprint.objects.create(user=user, state=SprintState.COMPLETED)
+    current_sprint = InterviewSprint.objects.create(user=user, state=SprintState.PREVIEW_READY)
+    Payment.objects.create(
+        user=user,
+        sprint=paid_old_sprint,
+        amount=4900,
+        currency="INR",
+        status=PaymentStatus.PAID,
+        paid_at=timezone.now(),
+        provider_order_id="order_old_sidebar",
+        provider_payment_id="pay_old_sidebar",
+    )
+    client.force_login(user)
+
+    response = client.get(reverse("workspace:index"))
+
+    assert response.status_code == 200
+    assert response.context["sprint"] == current_sprint
+    assert b"Prep Kit locked" in response.content
+    assert b"Prep Kit unlocks after verified payment in the MBP flow." in response.content
+    assert b"Prep Kit unlocked" not in response.content
