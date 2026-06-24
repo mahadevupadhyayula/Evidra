@@ -80,3 +80,127 @@ def build_workflow_steps(
         )
 
     return steps
+
+
+def build_next_step(
+    user,
+    sprint,
+    *,
+    url_resolver: Callable[[str], str],
+) -> dict[str, str]:
+    """Build the primary workspace next-step CTA for the authenticated user."""
+
+    del user  # Ownership is established by the caller's authenticated Sprint query.
+
+    base = {
+        "eyebrow": "Recommended next step",
+        "reassurance": "Your data is private and secure.",
+    }
+
+    if sprint is None:
+        return {
+            **base,
+            "title": "Start your Interview Sprint",
+            "body": "Create a Draft Interview Sprint to start the MBP workflow foundation.",
+            "cta_label": "Create Interview Sprint",
+            "cta_url": url_resolver("workspace:current_sprint"),
+            "cta_method": "post",
+        }
+
+    state = sprint.state
+    state_steps = {
+        SprintState.DRAFT: {
+            "title": "Add your resume",
+            "body": "Next step: add and confirm your resume.",
+            "cta_label": "Add resume",
+            "url_name": "documents:resume_upload",
+        },
+        SprintState.RESUME_READY: {
+            "title": "Review your career profile",
+            "body": "Your resume is confirmed. Review and confirm your career profile next.",
+            "cta_label": "Review profile",
+            "url_name": "profiles:profile_review",
+        },
+        SprintState.PROFILE_CONFIRMED: {
+            "title": "Add opportunity context",
+            "body": "Your career profile is confirmed. Add opportunity context next.",
+            "cta_label": "Add opportunity context",
+            "url_name": "opportunities:opportunity_detail",
+        },
+        SprintState.OPPORTUNITY_CONFIRMED: {
+            "title": "Review career evidence",
+            "body": "Your opportunity is confirmed. Review and approve career evidence next.",
+            "cta_label": "Review evidence",
+            "url_name": "evidence:evidence_review",
+        },
+        SprintState.EVIDENCE_REVIEW: {
+            "title": "Review career evidence",
+            "body": "Your opportunity is confirmed. Review and approve career evidence next.",
+            "cta_label": "Review evidence",
+            "url_name": "evidence:evidence_review",
+        },
+        SprintState.EVIDENCE_APPROVED: {
+            "title": "Generate reusable stories",
+            "body": "Your evidence is approved. Generate reusable interview stories next.",
+            "cta_label": "Generate reusable stories",
+            "url_name": "stories:story_bank",
+        },
+        SprintState.STORIES_READY: {
+            "title": "Review your story bank",
+            "body": "Your reusable story bank is ready.",
+            "cta_label": "Review story bank",
+            "url_name": "stories:story_bank",
+        },
+        SprintState.MATCHING_READY: {
+            "title": "Review readiness preview",
+            "body": "Your readiness preview is ready or in progress.",
+            "cta_label": "Review readiness preview",
+            "url_name": "previews:detail",
+        },
+        SprintState.PREVIEW_READY: {
+            "title": "Review readiness preview",
+            "body": "Your readiness preview is ready or in progress.",
+            "cta_label": "Review readiness preview",
+            "url_name": "previews:detail",
+        },
+        SprintState.PAYMENT_PENDING: {
+            "title": "Open your Prep Kit",
+            "body": "Your payment and Prep Kit are in progress.",
+            "cta_label": "Open Prep Kit",
+            "url_name": "prepkits:detail",
+        },
+        SprintState.PAID: {
+            "title": "Open your Prep Kit",
+            "body": "Your payment and Prep Kit are in progress.",
+            "cta_label": "Open Prep Kit",
+            "url_name": "prepkits:detail",
+        },
+        SprintState.PREPKIT_READY: {
+            "title": "Practice answers",
+            "body": "Your Prep Kit is ready. Complete text practice next.",
+            "cta_label": "Practice answers",
+            "url_name": "practice:index",
+        },
+        SprintState.PRACTICE_ACTIVE: {
+            "title": "Open your seven-day plan",
+            "body": "Your practice is active. Generate or follow your seven-day plan next.",
+            "cta_label": "Open seven-day plan",
+            "url_name": "plans:detail",
+        },
+        SprintState.PLAN_READY: {
+            "title": "Open your seven-day plan",
+            "body": "Your practice is active. Generate or follow your seven-day plan next.",
+            "cta_label": "Open seven-day plan",
+            "url_name": "plans:detail",
+        },
+    }
+
+    step = state_steps[state]
+    return {
+        **base,
+        "title": step["title"],
+        "body": step["body"],
+        "cta_label": step["cta_label"],
+        "cta_url": url_resolver(step["url_name"]),
+        "cta_method": "get",
+    }
