@@ -8,6 +8,7 @@ def test_signup_view_creates_user_and_logs_in(client):
     response = client.post(
         reverse("accounts:signup"),
         {
+            "full_name": "New User",
             "email": "new@example.com",
             "password1": "A-strong-test-password-123",
             "password2": "A-strong-test-password-123",
@@ -16,7 +17,8 @@ def test_signup_view_creates_user_and_logs_in(client):
 
     assert response.status_code == 302
     assert response.url == reverse("workspace:index")
-    assert get_user_model().objects.filter(email="new@example.com").exists()
+    user = get_user_model().objects.get(email="new@example.com")
+    assert user.first_name == "New User"
 
 
 def test_signup_view_links_to_login(client):
