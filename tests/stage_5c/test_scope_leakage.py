@@ -55,10 +55,15 @@ FORBIDDEN_DEPENDENCY_NAMES = {
     "pgvector",
     "django-allauth",
     "social-auth-app-django",
+    "allauth",
+    "google-auth",
+    "google-auth-oauthlib",
+    "python-social-auth",
     "stripe",
 }
 
 FORBIDDEN_UI_FRAGMENTS = [
+    "continue with google",
     "social login",
     "oauth",
     "subscription",
@@ -103,7 +108,16 @@ def test_stage_5c_does_not_declare_deferred_dependencies_or_settings():
 
     installed = "\n".join(settings.INSTALLED_APPS).lower()
     configured = "\n".join(dir(settings)).lower()
-    for fragment in ["celery", "redis", "pgvector", "social_auth", "allauth"]:
+    for fragment in [
+        "celery",
+        "redis",
+        "pgvector",
+        "social_auth",
+        "allauth",
+        "oauth",
+        "google_client",
+        "google_oauth",
+    ]:
         assert fragment not in installed
         assert fragment not in configured
 
