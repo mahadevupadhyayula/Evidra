@@ -50,7 +50,8 @@ def test_workspace_only_displays_authenticated_users_sprint(client):
     assert response.status_code == 200
     assert b"Sprint ID" not in response.content
     assert (
-        f"Sprint ID</dt>\n    <dd>{other_sprint.pk}</dd>".encode() not in response.content
+        f"Sprint ID</dt>\n    <dd>{other_sprint.pk}</dd>".encode()
+        not in response.content
     )
 
 
@@ -65,9 +66,17 @@ def test_workspace_only_displays_authenticated_users_sprint(client):
             "Add opportunity context",
             "opportunities:opportunity_detail",
         ),
-        (SprintState.OPPORTUNITY_CONFIRMED, "Review evidence", "evidence:evidence_review"),
+        (
+            SprintState.OPPORTUNITY_CONFIRMED,
+            "Review evidence",
+            "evidence:evidence_review",
+        ),
         (SprintState.EVIDENCE_REVIEW, "Review evidence", "evidence:evidence_review"),
-        (SprintState.EVIDENCE_APPROVED, "Generate reusable stories", "stories:story_bank"),
+        (
+            SprintState.EVIDENCE_APPROVED,
+            "Generate reusable stories",
+            "stories:story_bank",
+        ),
         (SprintState.STORIES_READY, "Review story bank", "stories:story_bank"),
         (SprintState.MATCHING_READY, "Review readiness preview", "previews:detail"),
         (SprintState.PREVIEW_READY, "Review readiness preview", "previews:detail"),
@@ -78,7 +87,9 @@ def test_workspace_only_displays_authenticated_users_sprint(client):
         (SprintState.PLAN_READY, "Open seven-day plan", "plans:detail"),
     ],
 )
-def test_workspace_next_step_uses_link_for_navigation_ctas(client, state, label, url_name):
+def test_workspace_next_step_uses_link_for_navigation_ctas(
+    client, state, label, url_name
+):
     user = get_user_model().objects.create_user(username=f"{state}@example.com")
     InterviewSprint.objects.create(user=user, state=state)
     client.force_login(user)
@@ -88,7 +99,10 @@ def test_workspace_next_step_uses_link_for_navigation_ctas(client, state, label,
     assert response.status_code == 200
     expected_link = f'<a class="button-link" href="{reverse(url_name)}">{label}</a>'
     assert expected_link.encode() in response.content
-    assert b'<form method="post" action="/workspace/sprints/current/">' not in response.content
+    assert (
+        b'<form method="post" action="/workspace/sprints/current/">'
+        not in response.content
+    )
 
 
 @pytest.mark.django_db
@@ -105,3 +119,132 @@ def test_workspace_next_step_uses_post_form_to_create_sprint(client):
         in response.content
     )
     assert b"Your data is private and secure." in response.content
+
+
+@pytest.mark.django_db
+def test_workspace_dashboard_metrics_are_current_user_current_sprint_only(client):
+    from apps.evidence.models import EvidenceCard, EvidenceStatus
+    from apps.matching.models import StoryMatch
+    from apps.stories.models import Story, StoryStatus
+    from tests.opportunities.helpers import make_profile_confirmed_sprint
+
+    user, sprint, profile = make_profile_confirmed_sprint("metrics@example.com")
+    other_user, other_sprint, other_profile = make_profile_confirmed_sprint(
+        "other-metrics@example.com"
+    )
+
+    EvidenceCard.objects.create(
+        user=user,
+        profile=profile,
+        source_document=sprint.active_resume,
+        title="Approved owned evidence",
+        source_excerpt="Owned source excerpt",
+        status=EvidenceStatus.APPROVED,
+    )
+    EvidenceCard.objects.create(
+        user=other_user,
+        profile=other_profile,
+        source_document=other_sprint.active_resume,
+        title="Other approved evidence",
+        source_excerpt="Other source excerpt",
+        status=EvidenceStatus.APPROVED,
+    )
+    EvidenceCard.objects.create(
+        user=user,
+        profile=profile,
+        source_document=sprint.active_resume,
+        title="Draft owned evidence",
+        source_excerpt="Draft source excerpt",
+        status=EvidenceStatus.DRAFT,
+    )
+
+    owned_story = Story.objects.create(
+        user=user,
+        profile=profile,
+        title="Ready owned story",
+        short_answer="Short answer",
+        ninety_second_answer="Ninety second answer",
+        detailed_answer="Detailed answer",
+        status=StoryStatus.READY,
+    )
+    Story.objects.create(
+        user=user,
+        profile=profile,
+        title="Edited owned story",
+        short_answer="Short answer",
+        ninety_second_answer="Ninety second answer",
+        detailed_answer="Detailed answer",
+        status=StoryStatus.EDITED,
+    )
+    Story.objects.create(
+        user=other_user,
+        profile=other_profile,
+        title="Other ready story",
+        short_answer="Short answer",
+        ninety_second_answer="Ninety second answer",
+        detailed_answer="Detailed answer",
+        status=StoryStatus.READY,
+    )
+
+    StoryMatch.objects.create(
+        sprint=sprint,
+        competency_key="strategy",
+        competency_label="Strategy",
+        primary_story=owned_story,
+        total_score=80,
+    )
+    StoryMatch.objects.create(
+        sprint=sprint,
+        competency_key="execution",
+        competency_label="Execution",
+        primary_story=owned_story,
+        total_score=60,
+    )
+    StoryMatch.objects.create(
+        sprint=other_sprint,
+        competency_key="strategy",
+        competency_label="Strategy",
+        total_score=100,
+    )
+
+    client.force_login(user)
+    response = client.get(reverse("workspace:index"))
+
+    assert response.status_code == 200
+    metrics = response.context["dashboard_metrics"]
+    assert metrics["approved_evidence_count"] == 1
+    assert metrics["ready_story_count"] == 2
+    assert metrics["readiness_score"] == 70
+    assert (
+        metrics["next_step_summary"]["title"] == response.context["next_step"]["title"]
+    )
+    assert b"+6 this week" not in response.content
+
+
+@pytest.mark.django_db
+def test_workspace_dashboard_metrics_are_null_safe_without_sprint_or_profile(client):
+    user = get_user_model().objects.create_user(username="null-safe@example.com")
+    client.force_login(user)
+
+    no_sprint_response = client.get(reverse("workspace:index"))
+
+    assert no_sprint_response.status_code == 200
+    assert no_sprint_response.context["dashboard_metrics"] == {
+        "approved_evidence_count": 0,
+        "ready_story_count": 0,
+        "readiness_score": None,
+        "next_step_summary": {
+            "title": "Start your Interview Sprint",
+            "body": "Create a Draft Interview Sprint to start the MBP workflow foundation.",
+            "cta_label": "Create Interview Sprint",
+        },
+    }
+
+    InterviewSprint.objects.create(user=user)
+    no_profile_response = client.get(reverse("workspace:index"))
+
+    assert no_profile_response.status_code == 200
+    metrics = no_profile_response.context["dashboard_metrics"]
+    assert metrics["approved_evidence_count"] == 0
+    assert metrics["ready_story_count"] == 0
+    assert metrics["readiness_score"] is None
