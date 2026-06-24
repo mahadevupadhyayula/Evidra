@@ -495,3 +495,52 @@ def test_workspace_sidebar_payment_status_ignores_non_current_sprint_payment(cli
     assert b"Prep Kit locked" in response.content
     assert b"Prep Kit unlocks after verified payment in the MBP flow." in response.content
     assert b"Prep Kit unlocked" not in response.content
+
+
+@pytest.mark.django_db
+def test_workspace_current_opportunity_uses_edit_label_before_confirmation(client):
+    from apps.opportunities.models import Opportunity
+    from tests.opportunities.helpers import (
+        jd_analysis_dict,
+        make_profile_confirmed_sprint,
+        opportunity_data,
+    )
+
+    user, sprint, _ = make_profile_confirmed_sprint("edit-opportunity@example.com")
+    Opportunity.objects.create(
+        sprint=sprint,
+        jd_analysis=jd_analysis_dict(),
+        **opportunity_data(),
+    )
+    client.force_login(user)
+
+    response = client.get(reverse("workspace:index"))
+
+    assert response.status_code == 200
+    assert b"Current opportunity" in response.content
+    assert b"Edit Opportunity" in response.content
+    assert b"New Opportunity" not in response.content
+
+
+@pytest.mark.django_db
+def test_workspace_current_opportunity_uses_resume_label_after_confirmation(client):
+    from apps.opportunities.models import CompanyContextStatus, Opportunity, OpportunityStatus
+    from tests.opportunities.helpers import jd_analysis_dict, opportunity_data
+
+    user = get_user_model().objects.create_user(username="resume-opportunity@example.com")
+    sprint = InterviewSprint.objects.create(user=user, state=SprintState.OPPORTUNITY_CONFIRMED)
+    Opportunity.objects.create(
+        sprint=sprint,
+        jd_analysis=jd_analysis_dict(),
+        company_context_status=CompanyContextStatus.SKIPPED,
+        confirmation_status=OpportunityStatus.CONFIRMED,
+        **opportunity_data(),
+    )
+    client.force_login(user)
+
+    response = client.get(reverse("workspace:index"))
+
+    assert response.status_code == 200
+    assert b"Current opportunity" in response.content
+    assert b"Resume Sprint" in response.content
+    assert b"New Opportunity" not in response.content

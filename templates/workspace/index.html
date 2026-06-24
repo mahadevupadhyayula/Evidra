@@ -70,6 +70,19 @@
           </ol>
         </section>
 
+        {% if opportunity_summary %}
+          <section class="workspace-panel" aria-labelledby="current-opportunity-title">
+            <p class="eyebrow">Current opportunity</p>
+            <h2 id="current-opportunity-title">{{ opportunity_summary.role_title }}</h2>
+            <p>{{ opportunity_summary.company_name }} · {{ opportunity_summary.role_family }}</p>
+            <p>Status: {{ opportunity_summary.status_label }} · {{ opportunity_summary.completed_steps }} of {{ opportunity_summary.total_steps }} steps complete</p>
+            {% if opportunity_action %}
+              <p><a class="button-link" href="{{ opportunity_action.url }}">{{ opportunity_action.label }}</a></p>
+              <p>{{ opportunity_action.help_text }}</p>
+            {% endif %}
+          </section>
+        {% endif %}
+
         <section class="workspace-panel" aria-labelledby="dashboard-metrics-title">
           <h2 id="dashboard-metrics-title">Dashboard metrics</h2>
           <dl>
