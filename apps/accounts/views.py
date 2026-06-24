@@ -4,7 +4,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.views.decorators.http import require_http_methods
 
-from apps.accounts.forms import EmailSignupForm
+from apps.accounts.forms import EmailAuthenticationForm, EmailSignupForm
 
 
 @require_http_methods(["GET", "POST"])
@@ -25,6 +25,7 @@ def signup(request):
 
 
 class EmailLoginView(LoginView):
+    authentication_form = EmailAuthenticationForm
     template_name = "accounts/login.html"
     redirect_authenticated_user = True
 
