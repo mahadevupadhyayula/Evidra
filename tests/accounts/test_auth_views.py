@@ -109,3 +109,26 @@ def test_login_and_logout_flow(client):
     workspace_response = client.get(reverse("workspace:index"))
     assert workspace_response.status_code == 302
     assert reverse("accounts:login") in workspace_response.url
+
+
+def test_signup_password_toggles_are_non_submitting_buttons(client):
+    response = client.get(reverse("accounts:signup"))
+
+    html = response.content.decode()
+    assert response.status_code == 200
+    assert html.count('class="auth-password-toggle"') == 2
+    assert html.count('type="button" class="auth-password-toggle"') == 2
+    assert 'data-password-toggle="id_password1"' in html
+    assert 'data-password-toggle="id_password2"' in html
+    assert 'aria-label="Show password"' in html
+
+
+def test_login_password_toggle_is_non_submitting_button(client):
+    response = client.get(reverse("accounts:login"))
+
+    html = response.content.decode()
+    assert response.status_code == 200
+    assert html.count('class="auth-password-toggle"') == 1
+    assert html.count('type="button" class="auth-password-toggle"') == 1
+    assert 'data-password-toggle="id_password"' in html
+    assert 'aria-label="Show password"' in html

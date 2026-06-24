@@ -42,7 +42,14 @@
           {% for field in form %}
             <div class="field">
               {{ field.label_tag }}
-              {{ field }}
+              {% if field.field.widget.input_type == "password" %}
+                <div class="auth-password-input">
+                  {{ field }}
+                  <button type="button" class="auth-password-toggle" data-password-toggle="{{ field.id_for_label }}" aria-label="Show password">Show</button>
+                </div>
+              {% else %}
+                {{ field }}
+              {% endif %}
               {{ field.errors }}
               {% if field.help_text %}<p class="help-text">{{ field.help_text }}</p>{% endif %}
             </div>
@@ -52,4 +59,18 @@
       </div>
     </div>
   </section>
+
+  <script>
+    document.querySelectorAll('[data-password-toggle]').forEach((button) => {
+      const input = document.getElementById(button.dataset.passwordToggle);
+      if (!input) return;
+
+      button.addEventListener('click', () => {
+        const showPassword = input.type === 'password';
+        input.type = showPassword ? 'text' : 'password';
+        button.textContent = showPassword ? 'Hide' : 'Show';
+        button.setAttribute('aria-label', showPassword ? 'Hide password' : 'Show password');
+      });
+    });
+  </script>
 {% endblock %}
