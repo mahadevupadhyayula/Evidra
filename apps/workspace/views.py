@@ -13,6 +13,8 @@ from apps.workspace.presentation import (
     build_current_opportunity_summary,
     build_next_step,
     build_recent_activity,
+    build_sidebar_payment_status,
+    build_sidebar_user,
     build_workflow_steps,
 )
 
@@ -87,6 +89,11 @@ def index(request):
         sprint=sprint,
         url_resolver=reverse,
     )
+    sidebar_user = build_sidebar_user(request.user)
+    sidebar_payment_status = build_sidebar_payment_status(
+        user=request.user,
+        sprint=sprint,
+    )
     return render(
         request,
         "workspace/index.html",
@@ -97,6 +104,8 @@ def index(request):
             "dashboard_metrics": dashboard_metrics,
             "opportunity_summary": opportunity_summary,
             "recent_activity": recent_activity,
+            "sidebar_user": sidebar_user,
+            "sidebar_payment_status": sidebar_payment_status,
         },
     )
 

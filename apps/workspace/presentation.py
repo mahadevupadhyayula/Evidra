@@ -6,6 +6,41 @@ from dataclasses import dataclass
 from apps.sprints.models import SprintState
 
 
+def build_sidebar_user(user) -> dict[str, str]:
+    """Build sidebar account identity from authenticated user fields only."""
+
+    full_name = user.get_full_name().strip()
+    display_name = full_name or user.email or user.username
+    return {
+        "display_name": display_name,
+        "email": user.email,
+    }
+
+
+def build_sidebar_payment_status(*, user, sprint) -> dict[str, str] | None:
+    """Build neutral Prep Kit entitlement copy from owned current-Sprint payments."""
+
+    if sprint is None:
+        return None
+
+    from apps.payments.models import Payment, PaymentStatus
+
+    has_paid_entitlement = Payment.objects.filter(
+        user=user,
+        sprint=sprint,
+        status=PaymentStatus.PAID,
+    ).exists()
+    if has_paid_entitlement:
+        return {
+            "label": "Prep Kit unlocked",
+            "body": "Paid Prep Kit is available for this Sprint.",
+        }
+    return {
+        "label": "Prep Kit locked",
+        "body": "Prep Kit unlocks after verified payment in the MBP flow.",
+    }
+
+
 def count_completed_workflow_steps(workflow_steps: list[dict[str, object]]) -> int:
     """Count completed presentation steps from the deterministic workflow tracker."""
 

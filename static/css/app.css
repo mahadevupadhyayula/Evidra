@@ -995,3 +995,40 @@ input {
 .opportunity-progress {
   font-weight: 800;
 }
+
+.workspace-sidebar-lower {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.workspace-account-card,
+.workspace-payment-card {
+  background: #f8fafc;
+  border: 1px solid #e0e7ff;
+  border-radius: 1rem;
+  padding: 0.85rem;
+}
+
+.workspace-account-card .eyebrow,
+.workspace-payment-card .eyebrow {
+  margin-bottom: 0.35rem;
+}
+
+.workspace-account-name,
+.workspace-payment-label {
+  color: #111827 !important;
+  font-weight: 900;
+  margin-bottom: 0.2rem !important;
+  overflow-wrap: anywhere;
+}
+
+.workspace-account-email {
+  font-size: 0.9rem;
+  margin-bottom: 0 !important;
+  overflow-wrap: anywhere;
+}
+
+.workspace-payment-card p:last-child {
+  margin-bottom: 0;
+}
